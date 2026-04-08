@@ -1,5 +1,8 @@
 import { useState, useRef } from "react";
 import { Plus, Trash2, Printer, X } from "lucide-react";
+import { useCreateSale } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { getGetTodaySummaryQueryKey, getGetMonthSummaryQueryKey, getGetMonthlyTotalsQueryKey, getListSalesQueryKey } from "@workspace/api-client-react";
 
 interface SaleItem {
   id: number;
@@ -9,18 +12,8 @@ interface SaleItem {
   rate: number;
 }
 
-interface CompletedSale {
-  billNo: string;
-  date: string;
-  customer: string;
-  phone: string;
-  note: string;
-  items: SaleItem[];
-  total: number;
-}
-
 function formatBDT(amount: number) {
-  return `BDT ${amount.toLocaleString("en-BD", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `BDT ${Number(amount).toLocaleString("en-BD", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function generateBillNo() {
@@ -54,22 +47,10 @@ function ReceiptPreview({ billNo, date, customer, phone, items, note }: {
         <p className="text-[10px] text-gray-600 dark:text-gray-400">Phone: 01933-479506</p>
       </div>
       <div className="border-t border-dashed border-gray-400 pt-2 mb-2 space-y-1">
-        <div className="flex justify-between">
-          <span>Customer</span>
-          <span className="font-medium">{customer || "-"}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Phone</span>
-          <span>{phone || "-"}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Bill No</span>
-          <span>{billNo}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Date</span>
-          <span>{date}</span>
-        </div>
+        <div className="flex justify-between"><span>Customer</span><span className="font-medium">{customer || "-"}</span></div>
+        <div className="flex justify-between"><span>Phone</span><span>{phone || "-"}</span></div>
+        <div className="flex justify-between"><span>Bill No</span><span>{billNo}</span></div>
+        <div className="flex justify-between"><span>Date</span><span>{date}</span></div>
       </div>
       <div className="border-t border-dashed border-gray-400 pt-2 mb-2">
         <div className="flex justify-between text-[10px] text-gray-500 dark:text-gray-400 mb-1">
@@ -94,13 +75,10 @@ function ReceiptPreview({ billNo, date, customer, phone, items, note }: {
         )}
       </div>
       <div className="border-t border-dashed border-gray-400 pt-2 flex justify-between font-bold">
-        <span>Total</span>
-        <span>{formatBDT(total)}</span>
+        <span>Total</span><span>{formatBDT(total)}</span>
       </div>
       {note && (
-        <div className="mt-3 border border-gray-300 dark:border-gray-600 rounded p-2 text-[10px] text-gray-600 dark:text-gray-400">
-          {note}
-        </div>
+        <div className="mt-3 border border-gray-300 dark:border-gray-600 rounded p-2 text-[10px] text-gray-600 dark:text-gray-400">{note}</div>
       )}
       <div className="mt-3 text-[10px] text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded p-2">
         Return Policy: Products purchased from SD Fashion can be returned or exchanged within 7 days with this billing receipt. The product must be unused and in original condition.
@@ -110,14 +88,16 @@ function ReceiptPreview({ billNo, date, customer, phone, items, note }: {
 }
 
 export default function NewSale() {
+  const queryClient = useQueryClient();
+  const createSale = useCreateSale();
+
   const [billNo] = useState(generateBillNo);
   const [date, setDate] = useState(todayISO);
   const [customer, setCustomer] = useState("");
   const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
   const [items, setItems] = useState<SaleItem[]>([{ id: 1, name: "", size: "-", qty: 1, rate: 0 }]);
-  const [success, setSuccess] = useState(false);
-  const [savedSale, setSavedSale] = useState<CompletedSale | null>(null);
+  const [savedSale, setSavedSale] = useState<{ billNo: string; date: string; customer: string; phone: string; note: string; items: SaleItem[] } | null>(null);
   const nextId = useRef(2);
   const receiptRef = useRef<HTMLDivElement>(null);
 
@@ -136,8 +116,31 @@ export default function NewSale() {
   };
 
   const handleComplete = () => {
-    setSavedSale({ billNo, date, customer, phone, note, items: [...items], total });
-    setSuccess(true);
+    const validItems = items.filter(i => i.name.trim());
+    if (validItems.length === 0) return;
+
+    createSale.mutate(
+      {
+        data: {
+          billNo,
+          date,
+          customer: customer || "Walk-in",
+          phone: phone || null,
+          note: note || null,
+          paymentMethod: "Cash",
+          items: validItems.map(i => ({ name: i.name, size: i.size, qty: i.qty, rate: i.rate })),
+        },
+      },
+      {
+        onSuccess: () => {
+          setSavedSale({ billNo, date, customer: customer || "Walk-in", phone, note, items: [...validItems] });
+          queryClient.invalidateQueries({ queryKey: getGetTodaySummaryQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getGetMonthSummaryQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getGetMonthlyTotalsQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getListSalesQueryKey() });
+        },
+      }
+    );
   };
 
   const handlePrint = () => {
@@ -145,38 +148,18 @@ export default function NewSale() {
     const content = receiptRef.current.innerHTML;
     const win = window.open("", "_blank");
     if (!win) return;
-    win.document.write(`
-      <html><head><title>Receipt - ${billNo}</title>
-      <style>
-        body { font-family: monospace; font-size: 11px; max-width: 300px; margin: 0 auto; padding: 16px; }
-        * { box-sizing: border-box; }
-        .flex { display: flex; }
-        .justify-between { justify-content: space-between; }
-        .text-center { text-align: center; }
-        .text-right { text-align: right; }
-        .font-bold { font-weight: bold; }
-        .border-t { border-top: 1px dashed #888; }
-        .border { border: 1px solid #ccc; }
-        .rounded { border-radius: 4px; }
-        .p-2 { padding: 8px; }
-        .pt-2 { padding-top: 8px; }
-        .mb-2 { margin-bottom: 8px; }
-        .mb-3 { margin-bottom: 12px; }
-        .mt-3 { margin-top: 12px; }
-        .w-8 { width: 2rem; }
-        .w-6 { width: 1.5rem; }
-        .w-20 { width: 5rem; }
-        .flex-\\[2\\] { flex: 2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .space-y-1 > * + * { margin-top: 4px; }
-        .py-0\\.5 { padding: 2px 0; }
-        .py-1 { padding: 4px 0; }
-        .text-base { font-size: 14px; }
-        .text-\\[10px\\] { font-size: 10px; }
-        .leading-relaxed { line-height: 1.6; }
-      </style>
-      </head><body>${content}</body></html>
-    `);
+    win.document.write(`<html><head><title>Receipt - ${billNo}</title>
+      <style>body{font-family:monospace;font-size:11px;max-width:300px;margin:0 auto;padding:16px;}
+      .flex{display:flex;}.justify-between{justify-content:space-between;}
+      .text-center{text-align:right;}.font-bold{font-weight:bold;}
+      .border-t{border-top:1px dashed #888;}.border{border:1px solid #ccc;}
+      .rounded{border-radius:4px;}.p-2{padding:8px;}.pt-2{padding-top:8px;}
+      .mb-2{margin-bottom:8px;}.mb-3{margin-bottom:12px;}.mt-3{margin-top:12px;}
+      .w-8{width:2rem;}.w-6{width:1.5rem;}.w-20{width:5rem;}
+      .flex-\\[2\\]{flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+      .truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+      .space-y-1>*+*{margin-top:4px;}.py-0\\.5{padding:2px 0;}</style>
+      </head><body>${content}</body></html>`);
     win.document.close();
     win.focus();
     win.print();
@@ -188,20 +171,16 @@ export default function NewSale() {
     setPhone("");
     setNote("");
     setItems([{ id: nextId.current++, name: "", size: "-", qty: 1, rate: 0 }]);
-    setSuccess(false);
     setSavedSale(null);
   };
 
-  const previewItems = success && savedSale ? savedSale.items : items;
-  const previewCustomer = success && savedSale ? savedSale.customer : customer;
-  const previewPhone = success && savedSale ? savedSale.phone : phone;
-  const previewNote = success && savedSale ? savedSale.note : note;
-  const previewBillNo = success && savedSale ? savedSale.billNo : billNo;
-  const previewDate = success && savedSale ? savedSale.date : date;
+  const previewItems = savedSale ? savedSale.items : items;
+  const previewCustomer = savedSale ? savedSale.customer : customer;
+  const previewPhone = savedSale ? savedSale.phone : phone;
+  const previewNote = savedSale ? savedSale.note : note;
 
   return (
     <div className="max-w-6xl mx-auto grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-5">
-      {/* Main form panel */}
       <div className="bg-card border border-card-border rounded-2xl p-6 shadow-sm">
         {/* Store info + bill meta */}
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6 pb-5 border-b border-border">
@@ -210,174 +189,102 @@ export default function NewSale() {
             <p className="text-xs text-muted-foreground mt-0.5">Address: Bonmala Road, Tongi College Gate, Gazipur, Dhaka</p>
             <p className="text-xs text-muted-foreground">Phone: 01933-479506</p>
           </div>
-          <div className="space-y-2 sm:text-right min-w-[200px]">
+          <div className="space-y-2 min-w-[200px]">
             <div>
               <label className="text-xs text-muted-foreground block mb-0.5">Bill No</label>
-              <input
-                type="text"
-                value={billNo}
-                readOnly
-                data-testid="input-bill-no"
-                className="w-full sm:w-44 px-3 py-1.5 text-sm font-mono rounded-lg border border-input bg-muted/50 text-foreground focus:outline-none"
-              />
+              <input type="text" value={billNo} readOnly data-testid="input-bill-no"
+                className="w-full px-3 py-1.5 text-sm font-mono rounded-lg border border-input bg-muted/50 text-foreground focus:outline-none" />
             </div>
             <div>
               <label className="text-xs text-muted-foreground block mb-0.5">Date</label>
-              <input
-                type="date"
-                value={date}
-                onChange={e => setDate(e.target.value)}
-                data-testid="input-date"
-                className="w-full sm:w-44 px-3 py-1.5 text-sm rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] transition"
-              />
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} data-testid="input-date"
+                className="w-full px-3 py-1.5 text-sm rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] transition" />
             </div>
           </div>
         </div>
 
-        {/* Customer info */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">Customer Name</label>
-            <input
-              type="text"
-              value={customer}
-              onChange={e => setCustomer(e.target.value)}
-              placeholder="Customer name"
-              data-testid="input-customer"
-              className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] transition"
-            />
+            <input type="text" value={customer} onChange={e => setCustomer(e.target.value)} placeholder="Customer name" data-testid="input-customer"
+              className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] transition" />
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">Customer Phone <span className="text-muted-foreground/60">(optional)</span></label>
-            <input
-              type="text"
-              value={phone}
-              onChange={e => setPhone(e.target.value)}
-              placeholder="Phone number"
-              data-testid="input-phone"
-              className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] transition"
-            />
+            <input type="text" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Phone number" data-testid="input-phone"
+              className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] transition" />
           </div>
         </div>
 
-        {/* Note */}
         <div className="mb-5">
           <label className="text-xs font-medium text-muted-foreground mb-1 block">Note</label>
-          <textarea
-            value={note}
-            onChange={e => setNote(e.target.value)}
-            rows={2}
-            placeholder="+"
-            data-testid="input-note"
-            className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] resize-none transition"
-          />
+          <textarea value={note} onChange={e => setNote(e.target.value)} rows={2} placeholder="+" data-testid="input-note"
+            className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] resize-none transition" />
         </div>
 
-        {/* Items table */}
+        {/* Items */}
         <div className="mb-4">
-          {/* Header */}
           <div className="grid grid-cols-[1fr_90px_80px_110px_120px_36px] gap-2 px-1 mb-1">
             {["Item", "Size", "Qty", "Rate", "Amount", ""].map(h => (
               <span key={h} className="text-xs font-semibold text-muted-foreground">{h}</span>
             ))}
           </div>
-
           <div className="space-y-2">
             {items.map((item, idx) => (
               <div key={item.id} className="grid grid-cols-[1fr_90px_80px_110px_120px_36px] gap-2 items-center" data-testid={`row-item-${idx}`}>
-                <input
-                  type="text"
-                  value={item.name}
-                  onChange={e => updateItem(item.id, "name", e.target.value)}
-                  placeholder="Item name"
-                  data-testid={`input-item-name-${idx}`}
-                  className="px-3 py-2 rounded-lg border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] transition"
-                />
-                <select
-                  value={item.size}
-                  onChange={e => updateItem(item.id, "size", e.target.value)}
-                  data-testid={`select-size-${idx}`}
-                  className="px-2 py-2 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] transition"
-                >
+                <input type="text" value={item.name} onChange={e => updateItem(item.id, "name", e.target.value)} placeholder="Item name" data-testid={`input-item-name-${idx}`}
+                  className="px-3 py-2 rounded-lg border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] transition" />
+                <select value={item.size} onChange={e => updateItem(item.id, "size", e.target.value)} data-testid={`select-size-${idx}`}
+                  className="px-2 py-2 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] transition">
                   {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
-                <input
-                  type="number"
-                  value={item.qty}
-                  min={1}
-                  onChange={e => updateItem(item.id, "qty", Math.max(1, parseInt(e.target.value) || 1))}
-                  data-testid={`input-qty-${idx}`}
-                  className="px-3 py-2 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] text-center transition"
-                />
-                <input
-                  type="number"
-                  value={item.rate || ""}
-                  min={0}
-                  placeholder="0"
-                  onChange={e => updateItem(item.id, "rate", parseFloat(e.target.value) || 0)}
-                  data-testid={`input-rate-${idx}`}
-                  className="px-3 py-2 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] transition"
-                />
+                <input type="number" value={item.qty} min={1} onChange={e => updateItem(item.id, "qty", Math.max(1, parseInt(e.target.value) || 1))} data-testid={`input-qty-${idx}`}
+                  className="px-3 py-2 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] text-center transition" />
+                <input type="number" value={item.rate || ""} min={0} placeholder="0" onChange={e => updateItem(item.id, "rate", parseFloat(e.target.value) || 0)} data-testid={`input-rate-${idx}`}
+                  className="px-3 py-2 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] transition" />
                 <div className="px-3 py-2 rounded-lg border border-border bg-muted/40 text-sm font-semibold text-foreground" data-testid={`text-amount-${idx}`}>
                   {formatBDT(item.qty * item.rate)}
                 </div>
-                <button
-                  onClick={() => removeItem(item.id)}
-                  disabled={items.length === 1}
-                  data-testid={`button-remove-item-${idx}`}
-                  className="w-9 h-9 flex items-center justify-center rounded-lg bg-[hsl(0,84%,60%)] hover:bg-[hsl(0,84%,50%)] disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors"
-                >
+                <button onClick={() => removeItem(item.id)} disabled={items.length === 1} data-testid={`button-remove-item-${idx}`}
+                  className="w-9 h-9 flex items-center justify-center rounded-lg bg-[hsl(0,84%,60%)] hover:bg-[hsl(0,84%,50%)] disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors">
                   <X className="w-4 h-4" />
                 </button>
               </div>
             ))}
           </div>
-
-          <button
-            onClick={addItem}
-            data-testid="button-add-item"
-            className="mt-3 flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[hsl(221,83%,53%)] hover:bg-[hsl(221,83%,45%)] text-white text-sm font-semibold transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Add Item
+          <button onClick={addItem} data-testid="button-add-item"
+            className="mt-3 flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[hsl(221,83%,53%)] hover:bg-[hsl(221,83%,45%)] text-white text-sm font-semibold transition-colors">
+            <Plus className="w-4 h-4" />Add Item
           </button>
         </div>
 
-        {/* Total + Actions */}
         <div className="border-t border-border pt-4 space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-base font-bold text-foreground">Total</span>
             <span className="text-lg font-extrabold text-foreground" data-testid="text-total">{formatBDT(total)}</span>
           </div>
-
           <div className="flex flex-wrap gap-3">
-            <button
-              onClick={handleComplete}
-              data-testid="button-complete-sale"
-              className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-[hsl(174,72%,40%)] hover:bg-[hsl(174,72%,34%)] text-white font-semibold text-sm transition-colors"
-            >
-              Complete Sale
+            <button onClick={handleComplete} disabled={createSale.isPending} data-testid="button-complete-sale"
+              className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-[hsl(174,72%,40%)] hover:bg-[hsl(174,72%,34%)] disabled:opacity-60 text-white font-semibold text-sm transition-colors">
+              {createSale.isPending ? "Saving..." : "Complete Sale"}
             </button>
-            <button
-              onClick={handlePrint}
-              data-testid="button-print-bill"
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-[hsl(221,83%,53%)] hover:bg-[hsl(221,83%,45%)] text-white font-semibold text-sm transition-colors"
-            >
-              <Printer className="w-4 h-4" />
-              Print Bill
+            <button onClick={handlePrint} data-testid="button-print-bill"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-[hsl(221,83%,53%)] hover:bg-[hsl(221,83%,45%)] text-white font-semibold text-sm transition-colors">
+              <Printer className="w-4 h-4" />Print Bill
             </button>
-            <button
-              onClick={handleClear}
-              data-testid="button-clear"
-              className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl border border-border bg-card hover:bg-muted text-foreground font-semibold text-sm transition-colors"
-            >
+            <button onClick={handleClear} data-testid="button-clear"
+              className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl border border-border bg-card hover:bg-muted text-foreground font-semibold text-sm transition-colors">
               Clear
             </button>
           </div>
-
-          {success && (
+          {savedSale && (
             <div className="px-4 py-3 rounded-xl bg-[hsl(174,72%,94%)] dark:bg-[hsl(174,72%,20%)] border border-[hsl(174,72%,75%)] dark:border-[hsl(174,72%,35%)] text-[hsl(174,72%,28%)] dark:text-[hsl(174,72%,70%)] text-sm font-semibold">
-              Sale recorded successfully!
+              Sale saved to database successfully!
+            </div>
+          )}
+          {createSale.isError && (
+            <div className="px-4 py-3 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-sm font-semibold">
+              Failed to save sale. Please try again.
             </div>
           )}
         </div>
@@ -389,14 +296,7 @@ export default function NewSale() {
           <h3 className="text-sm font-bold text-white">Receipt Preview</h3>
         </div>
         <div className="p-4" ref={receiptRef}>
-          <ReceiptPreview
-            billNo={previewBillNo}
-            date={previewDate}
-            customer={previewCustomer}
-            phone={previewPhone}
-            items={previewItems}
-            note={previewNote}
-          />
+          <ReceiptPreview billNo={billNo} date={date} customer={previewCustomer} phone={previewPhone} items={previewItems} note={previewNote} />
         </div>
       </div>
     </div>

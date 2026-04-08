@@ -8,3 +8,67 @@
 export interface HealthStatus {
   status: string;
 }
+
+export interface SaleItem {
+  id: number;
+  saleId: number;
+  name: string;
+  size: string;
+  qty: number;
+  rate: number;
+  amount: number;
+}
+
+export interface Sale {
+  id: number;
+  billNo: string;
+  date: string;
+  customer: string;
+  /** @nullable */
+  phone: string | null;
+  /** @nullable */
+  note: string | null;
+  paymentMethod: string;
+  total: number;
+  createdAt: string;
+  items: SaleItem[];
+}
+
+export interface CreateSaleItemBody {
+  name: string;
+  size: string;
+  qty: number;
+  rate: number;
+}
+
+export interface CreateSaleBody {
+  billNo: string;
+  date: string;
+  customer: string;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  note?: string | null;
+  paymentMethod: string;
+  items: CreateSaleItemBody[];
+}
+
+export interface SalesSummary {
+  total: number;
+  count: number;
+}
+
+export interface MonthlyTotal {
+  month: string;
+  total: number;
+  count: number;
+}
+
+export type ListSalesParams = {
+  year?: number;
+  month?: number;
+};
+
+export type GetMonthlyTotalsParams = {
+  year?: number;
+};

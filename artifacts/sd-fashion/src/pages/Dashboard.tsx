@@ -1,10 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { CalendarDays, ShoppingBag, TrendingUp, Calendar } from "lucide-react";
 import {
-  getTodaySales,
-  getSalesByMonth,
-  getMonthlyTotals,
-} from "@/lib/salesData";
+  useGetTodaySummary,
+  useGetMonthSummary,
+  useGetMonthlyTotals,
+  useListSales,
+} from "@workspace/api-client-react";
 import {
   BarChart,
   Bar,
@@ -16,7 +17,7 @@ import {
 } from "recharts";
 
 function formatBDT(amount: number) {
-  return `BDT ${amount.toLocaleString("en-BD", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `BDT ${Number(amount).toLocaleString("en-BD", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function SummaryCard({
@@ -25,12 +26,14 @@ function SummaryCard({
   count,
   icon: Icon,
   iconBg,
+  isLoading,
 }: {
   title: string;
   amount: number;
   count: number;
   icon: React.ElementType;
   iconBg: string;
+  isLoading?: boolean;
 }) {
   return (
     <div
@@ -43,11 +46,15 @@ function SummaryCard({
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-muted-foreground mb-1">{title}</p>
-          <p className="text-2xl font-extrabold text-foreground tracking-tight" data-testid={`text-amount-${title.toLowerCase().replace(/\s+/g, "-")}`}>
-            {formatBDT(amount)}
-          </p>
+          {isLoading ? (
+            <div className="h-8 w-32 bg-muted animate-pulse rounded-lg mb-1" />
+          ) : (
+            <p className="text-2xl font-extrabold text-foreground tracking-tight" data-testid={`text-amount-${title.toLowerCase().replace(/\s+/g, "-")}`}>
+              {formatBDT(amount)}
+            </p>
+          )}
           <p className="text-xs text-muted-foreground mt-1" data-testid={`text-count-${title.toLowerCase().replace(/\s+/g, "-")}`}>
-            {count} {count === 1 ? "sale" : "sales"}
+            {isLoading ? "..." : `${count} ${count === 1 ? "sale" : "sales"}`}
           </p>
         </div>
       </div>
@@ -56,8 +63,8 @@ function SummaryCard({
 }
 
 const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December",
 ];
 
 export default function Dashboard() {
@@ -66,51 +73,46 @@ export default function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   const [monthPickerOpen, setMonthPickerOpen] = useState(false);
 
-  const todaySales = useMemo(() => getTodaySales(), []);
-  const todayTotal = todaySales.reduce((s, sale) => s + sale.total, 0);
-
-  const currentMonthSales = useMemo(
-    () => getSalesByMonth(selectedYear, now.getMonth() + 1),
-    [selectedYear]
+  const { data: todaySummary, isLoading: todayLoading } = useGetTodaySummary();
+  const { data: monthSummary, isLoading: monthLoading } = useGetMonthSummary();
+  const { data: monthlyTotals, isLoading: chartLoading } = useGetMonthlyTotals(
+    { year: selectedYear },
+    { query: { queryKey: ["monthly-totals", selectedYear] } }
   );
-  const currentMonthTotal = currentMonthSales.reduce((s, sale) => s + sale.total, 0);
-
-  const reportSales = useMemo(
-    () => getSalesByMonth(selectedYear, selectedMonth),
-    [selectedYear, selectedMonth]
+  const { data: reportSales } = useListSales(
+    { year: selectedYear, month: selectedMonth },
+    { query: { queryKey: ["sales", selectedYear, selectedMonth] } }
   );
-  const reportTotal = reportSales.reduce((s, sale) => s + sale.total, 0);
 
-  const chartData = useMemo(() => getMonthlyTotals(selectedYear), [selectedYear]);
-
+  const reportTotal = (reportSales ?? []).reduce((s, sale) => s + sale.total, 0);
   const reportMonthLabel = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
   const selectedMonthName = MONTHS[selectedMonth - 1];
 
-  function pad(n: number) {
-    return String(n).padStart(2, "0");
-  }
+  const chartData = chartLoading
+    ? []
+    : (monthlyTotals ?? []).map(m => ({ month: m.month, total: m.total }));
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
-      {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <SummaryCard
           title="Today Sales"
-          amount={todayTotal}
-          count={todaySales.length}
+          amount={todaySummary?.total ?? 0}
+          count={todaySummary?.count ?? 0}
           icon={ShoppingBag}
           iconBg="bg-[hsl(174,72%,40%)]"
+          isLoading={todayLoading}
         />
         <SummaryCard
           title="This Month Sales"
-          amount={currentMonthTotal}
-          count={currentMonthSales.length}
+          amount={monthSummary?.total ?? 0}
+          count={monthSummary?.count ?? 0}
           icon={TrendingUp}
           iconBg="bg-[hsl(221,83%,53%)]"
+          isLoading={monthLoading}
         />
       </div>
 
-      {/* Monthly Sales Report */}
       <div className="bg-card border border-card-border rounded-2xl p-6 shadow-sm">
         <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
           <h2 className="text-base font-semibold text-foreground">Monthly Sales Report</h2>
@@ -135,10 +137,7 @@ export default function Dashboard() {
                     return (
                       <button
                         key={m}
-                        onClick={() => {
-                          setSelectedMonth(monthNum);
-                          setMonthPickerOpen(false);
-                        }}
+                        onClick={() => { setSelectedMonth(monthNum); setMonthPickerOpen(false); }}
                         data-testid={`button-month-${monthNum}`}
                         className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                           isSelected
@@ -157,7 +156,6 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-          {/* Report Total */}
           <div
             className="bg-background border border-border rounded-xl p-5 hover:shadow-sm transition-shadow duration-150"
             data-testid="card-report-total"
@@ -172,13 +170,12 @@ export default function Dashboard() {
                   {formatBDT(reportTotal)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-report-count">
-                  {reportSales.length} {reportSales.length === 1 ? "sale" : "sales"}
+                  {(reportSales ?? []).length} sales
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Report Month */}
           <div
             className="bg-background border border-border rounded-xl p-5 hover:shadow-sm transition-shadow duration-150"
             data-testid="card-report-month"
@@ -198,7 +195,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Chart */}
         <div>
           <p className="text-sm font-semibold text-foreground mb-4">Monthly Sales Overview — {selectedYear}</p>
           <ResponsiveContainer width="100%" height={220}>
@@ -228,12 +224,7 @@ export default function Dashboard() {
                 formatter={(value: number) => [formatBDT(value), "Sales"]}
                 cursor={{ fill: "hsl(var(--muted))", radius: 4 }}
               />
-              <Bar
-                dataKey="total"
-                fill="hsl(174,72%,40%)"
-                radius={[6, 6, 0, 0]}
-                maxBarSize={40}
-              />
+              <Bar dataKey="total" fill="hsl(174,72%,40%)" radius={[6, 6, 0, 0]} maxBarSize={40} />
             </BarChart>
           </ResponsiveContainer>
         </div>

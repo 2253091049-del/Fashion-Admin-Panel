@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: sales
+    description: Sales operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,136 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /sales:
+    get:
+      operationId: listSales
+      tags: [sales]
+      summary: List sales
+      description: Returns all sales, optionally filtered by year and month
+      parameters:
+        - name: year
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: month
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of sales
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Sale"
+    post:
+      operationId: createSale
+      tags: [sales]
+      summary: Create a sale
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSaleBody"
+      responses:
+        "201":
+          description: Created sale
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Sale"
+        "400":
+          description: Validation error
+
+  /sales/summary/today:
+    get:
+      operationId: getTodaySummary
+      tags: [sales]
+      summary: Get today's sales summary
+      responses:
+        "200":
+          description: Today summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesSummary"
+
+  /sales/summary/month:
+    get:
+      operationId: getMonthSummary
+      tags: [sales]
+      summary: Get this month's sales summary
+      responses:
+        "200":
+          description: Month summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesSummary"
+
+  /sales/summary/monthly-totals:
+    get:
+      operationId: getMonthlyTotals
+      tags: [sales]
+      summary: Get monthly totals for the year
+      parameters:
+        - name: year
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Monthly totals array
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MonthlyTotal"
+
+  /sales/{id}:
+    get:
+      operationId: getSale
+      tags: [sales]
+      summary: Get a single sale
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Sale
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Sale"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteSale
+      tags: [sales]
+      summary: Delete a sale
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +166,133 @@ components:
       required:
         - status
 
+    SaleItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        saleId:
+          type: integer
+        name:
+          type: string
+        size:
+          type: string
+        qty:
+          type: integer
+        rate:
+          type: number
+        amount:
+          type: number
+      required:
+        - id
+        - saleId
+        - name
+        - size
+        - qty
+        - rate
+        - amount
+
+    Sale:
+      type: object
+      properties:
+        id:
+          type: integer
+        billNo:
+          type: string
+        date:
+          type: string
+        customer:
+          type: string
+        phone:
+          type: ["string", "null"]
+        note:
+          type: ["string", "null"]
+        paymentMethod:
+          type: string
+        total:
+          type: number
+        createdAt:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SaleItem"
+      required:
+        - id
+        - billNo
+        - date
+        - customer
+        - phone
+        - note
+        - paymentMethod
+        - total
+        - createdAt
+        - items
+
+    CreateSaleItemBody:
+      type: object
+      properties:
+        name:
+          type: string
+        size:
+          type: string
+        qty:
+          type: integer
+        rate:
+          type: number
+      required:
+        - name
+        - size
+        - qty
+        - rate
+
+    CreateSaleBody:
+      type: object
+      properties:
+        billNo:
+          type: string
+        date:
+          type: string
+        customer:
+          type: string
+        phone:
+          type: ["string", "null"]
+        note:
+          type: ["string", "null"]
+        paymentMethod:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreateSaleItemBody"
+      required:
+        - billNo
+        - date
+        - customer
+        - paymentMethod
+        - items
+
+    SalesSummary:
+      type: object
+      properties:
+        total:
+          type: number
+        count:
+          type: integer
+      required:
+        - total
+        - count
+
+    MonthlyTotal:
+      type: object
+      properties:
+        month:
+          type: string
+        total:
+          type: number
+        count:
+          type: integer
+      required:
+        - month
+        - total
+        - count

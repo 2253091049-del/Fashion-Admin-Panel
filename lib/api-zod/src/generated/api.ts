@@ -14,3 +14,123 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * Returns all sales, optionally filtered by year and month
+ * @summary List sales
+ */
+export const ListSalesQueryParams = zod.object({
+  year: zod.coerce.number().optional(),
+  month: zod.coerce.number().optional(),
+});
+
+export const ListSalesResponseItem = zod.object({
+  id: zod.number(),
+  billNo: zod.string(),
+  date: zod.string(),
+  customer: zod.string(),
+  phone: zod.string().nullable(),
+  note: zod.string().nullable(),
+  paymentMethod: zod.string(),
+  total: zod.number(),
+  createdAt: zod.string(),
+  items: zod.array(
+    zod.object({
+      id: zod.number(),
+      saleId: zod.number(),
+      name: zod.string(),
+      size: zod.string(),
+      qty: zod.number(),
+      rate: zod.number(),
+      amount: zod.number(),
+    }),
+  ),
+});
+export const ListSalesResponse = zod.array(ListSalesResponseItem);
+
+/**
+ * @summary Create a sale
+ */
+export const CreateSaleBody = zod.object({
+  billNo: zod.string(),
+  date: zod.string(),
+  customer: zod.string(),
+  phone: zod.string().nullish(),
+  note: zod.string().nullish(),
+  paymentMethod: zod.string(),
+  items: zod.array(
+    zod.object({
+      name: zod.string(),
+      size: zod.string(),
+      qty: zod.number(),
+      rate: zod.number(),
+    }),
+  ),
+});
+
+/**
+ * @summary Get today's sales summary
+ */
+export const GetTodaySummaryResponse = zod.object({
+  total: zod.number(),
+  count: zod.number(),
+});
+
+/**
+ * @summary Get this month's sales summary
+ */
+export const GetMonthSummaryResponse = zod.object({
+  total: zod.number(),
+  count: zod.number(),
+});
+
+/**
+ * @summary Get monthly totals for the year
+ */
+export const GetMonthlyTotalsQueryParams = zod.object({
+  year: zod.coerce.number().optional(),
+});
+
+export const GetMonthlyTotalsResponseItem = zod.object({
+  month: zod.string(),
+  total: zod.number(),
+  count: zod.number(),
+});
+export const GetMonthlyTotalsResponse = zod.array(GetMonthlyTotalsResponseItem);
+
+/**
+ * @summary Get a single sale
+ */
+export const GetSaleParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetSaleResponse = zod.object({
+  id: zod.number(),
+  billNo: zod.string(),
+  date: zod.string(),
+  customer: zod.string(),
+  phone: zod.string().nullable(),
+  note: zod.string().nullable(),
+  paymentMethod: zod.string(),
+  total: zod.number(),
+  createdAt: zod.string(),
+  items: zod.array(
+    zod.object({
+      id: zod.number(),
+      saleId: zod.number(),
+      name: zod.string(),
+      size: zod.string(),
+      qty: zod.number(),
+      rate: zod.number(),
+      amount: zod.number(),
+    }),
+  ),
+});
+
+/**
+ * @summary Delete a sale
+ */
+export const DeleteSaleParams = zod.object({
+  id: zod.coerce.number(),
+});
