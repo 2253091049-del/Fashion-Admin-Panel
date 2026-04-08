@@ -1,0 +1,80 @@
+Design a modern, clean admin dashboard UI inspired by a fashion POS system.
+
+Style:
+- Minimal, soft UI
+- Glassmorphism + subtle shadows
+- Smooth rounded corners (12px–16px)
+- Premium SaaS look
+
+Color Palette:
+- Sidebar: Dark blue gradient (#0f172a → #1e293b)
+- Primary: Teal/green accent (#14b8a6)
+- Background: Light gray (#f1f5f9)
+- Cards: White with soft shadow
+- Text: Dark gray (#1e293b)
+
+Layout:
+
+1. Sidebar (Fixed Left):
+   - Width: ~240px
+   - Logo: “SD Fashion” (bold + small icon)
+   - Menu:
+     - Dashboard (active highlight with teal background)
+     - New Sale
+     - Sales History
+   - Bottom:
+     - User profile (admin with icon)
+     - Logout button (red gradient)
+
+2. Top Header:
+   - Left: “Dashboard” title (bold, large)
+   - Right: Dynamic date (e.g., Wednesday, 8 April 2026)
+
+3. Main Dashboard Content:
+
+   A. Stats Cards (Grid 2 columns):
+   - Card Design:
+     - Rounded (xl)
+     - Soft shadow
+     - Icon in small colored square
+   - Card 1:
+     - Title: Today Sales
+     - Value: BDT 0.00 (large bold)
+     - Subtitle: 0 sales
+   - Card 2:
+     - Title: This Month Sales
+     - Value: BDT 0.00
+     - Subtitle: 0 sales
+
+   B. Monthly Sales Report Section:
+   - Container with padding + shadow
+   - Title: "Monthly Sales Report"
+   - Right: Rounded button with calendar icon (April 2026)
+
+   Inside:
+   - Two cards side by side:
+     1. Report Total
+        - BDT 0.00
+        - 0 sales
+     2. Report Month
+        - 2026-04
+        - Selected month
+
+Typography:
+- Font: Inter / Poppins
+- Headings: Semi-bold
+- Values: Extra bold, large size
+
+UI Details:
+- Hover effects on sidebar items
+- Smooth transitions (0.2s ease)
+- Consistent spacing (16px–24px padding)
+- Icons: outline style (Heroicons)
+
+Extra:
+- Responsive (tablet + mobile)
+- Collapsible sidebar on mobile
+- Clean spacing and alignment (grid-based)
+
+Goal:
+Make the UI look modern, premium, and clean — similar to SaaS dashboards like Stripe or Notion admin panels.
