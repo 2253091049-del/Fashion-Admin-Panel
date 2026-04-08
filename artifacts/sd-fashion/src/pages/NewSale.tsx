@@ -1,189 +1,402 @@
-import { useState } from "react";
-import { Plus, Trash2, ShoppingCart, CheckCircle } from "lucide-react";
+import { useState, useRef } from "react";
+import { Plus, Trash2, Printer, X } from "lucide-react";
 
-const PRODUCTS = [
-  { name: "Slim Fit Jeans", price: 1800 },
-  { name: "Floral Dress", price: 2500 },
-  { name: "Polo Shirt", price: 950 },
-  { name: "Bomber Jacket", price: 4200 },
-  { name: "Linen Trousers", price: 1600 },
-  { name: "Knit Sweater", price: 2100 },
-  { name: "Cargo Pants", price: 1400 },
-  { name: "Maxi Skirt", price: 1750 },
-  { name: "Denim Jacket", price: 3200 },
-  { name: "Sports Tee", price: 750 },
-];
-
-interface CartItem {
+interface SaleItem {
+  id: number;
   name: string;
-  price: number;
+  size: string;
   qty: number;
+  rate: number;
+}
+
+interface CompletedSale {
+  billNo: string;
+  date: string;
+  customer: string;
+  phone: string;
+  note: string;
+  items: SaleItem[];
+  total: number;
 }
 
 function formatBDT(amount: number) {
   return `BDT ${amount.toLocaleString("en-BD", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-export default function NewSale() {
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [customer, setCustomer] = useState("");
-  const [payment, setPayment] = useState<"Cash" | "Card" | "Mobile">("Cash");
-  const [success, setSuccess] = useState(false);
+function generateBillNo() {
+  const now = new Date();
+  const d = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+  const rand = Math.floor(Math.random() * 900) + 100;
+  return `SD-${d}${rand}`;
+}
 
-  const addToCart = (product: { name: string; price: number }) => {
-    setCart(prev => {
-      const existing = prev.find(i => i.name === product.name);
-      if (existing) {
-        return prev.map(i => i.name === product.name ? { ...i, qty: i.qty + 1 } : i);
-      }
-      return [...prev, { ...product, qty: 1 }];
-    });
-  };
+function todayISO() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
 
-  const removeFromCart = (name: string) => {
-    setCart(prev => prev.filter(i => i.name !== name));
-  };
+const SIZES = ["-", "XS", "S", "M", "L", "XL", "XXL", "Free"];
 
-  const updateQty = (name: string, qty: number) => {
-    if (qty <= 0) return removeFromCart(name);
-    setCart(prev => prev.map(i => i.name === name ? { ...i, qty } : i));
-  };
-
-  const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
-
-  const handleSubmit = () => {
-    if (cart.length === 0) return;
-    setSuccess(true);
-    setCart([]);
-    setCustomer("");
-    setTimeout(() => setSuccess(false), 3000);
-  };
-
-  if (success) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4">
-        <div className="w-16 h-16 rounded-full bg-[hsl(174,72%,94%)] dark:bg-[hsl(174,72%,20%)] flex items-center justify-center">
-          <CheckCircle className="w-8 h-8 text-[hsl(174,72%,40%)]" />
-        </div>
-        <h2 className="text-xl font-bold text-foreground">Sale Recorded!</h2>
-        <p className="text-muted-foreground text-sm">The sale has been saved successfully.</p>
+function ReceiptPreview({ billNo, date, customer, phone, items, note }: {
+  billNo: string;
+  date: string;
+  customer: string;
+  phone: string;
+  items: SaleItem[];
+  note: string;
+}) {
+  const total = items.reduce((s, i) => s + i.qty * i.rate, 0);
+  return (
+    <div className="font-mono text-[11px] leading-relaxed text-gray-800 dark:text-gray-200 p-1">
+      <div className="text-center mb-3">
+        <p className="text-base font-bold">SD Fashion</p>
+        <p className="text-[10px] text-gray-600 dark:text-gray-400">Address: Bonmala Road, Tongi College Gate, Gazipur, Dhaka</p>
+        <p className="text-[10px] text-gray-600 dark:text-gray-400">Phone: 01933-479506</p>
       </div>
-    );
-  }
+      <div className="border-t border-dashed border-gray-400 pt-2 mb-2 space-y-1">
+        <div className="flex justify-between">
+          <span>Customer</span>
+          <span className="font-medium">{customer || "-"}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Phone</span>
+          <span>{phone || "-"}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Bill No</span>
+          <span>{billNo}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Date</span>
+          <span>{date}</span>
+        </div>
+      </div>
+      <div className="border-t border-dashed border-gray-400 pt-2 mb-2">
+        <div className="flex justify-between text-[10px] text-gray-500 dark:text-gray-400 mb-1">
+          <span className="flex-[2]">Item</span>
+          <span className="w-8 text-center">Size</span>
+          <span className="w-6 text-center">Qty</span>
+          <span className="w-20 text-right">Rate</span>
+          <span className="w-20 text-right">Amount</span>
+        </div>
+        {items.length === 0 ? (
+          <p className="text-center text-gray-400 py-1">No items</p>
+        ) : (
+          items.map(item => (
+            <div key={item.id} className="flex justify-between py-0.5">
+              <span className="flex-[2] truncate">{item.name || "-"}</span>
+              <span className="w-8 text-center">{item.size}</span>
+              <span className="w-6 text-center">{item.qty}</span>
+              <span className="w-20 text-right">{formatBDT(item.rate)}</span>
+              <span className="w-20 text-right">{formatBDT(item.qty * item.rate)}</span>
+            </div>
+          ))
+        )}
+      </div>
+      <div className="border-t border-dashed border-gray-400 pt-2 flex justify-between font-bold">
+        <span>Total</span>
+        <span>{formatBDT(total)}</span>
+      </div>
+      {note && (
+        <div className="mt-3 border border-gray-300 dark:border-gray-600 rounded p-2 text-[10px] text-gray-600 dark:text-gray-400">
+          {note}
+        </div>
+      )}
+      <div className="mt-3 text-[10px] text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded p-2">
+        Return Policy: Products purchased from SD Fashion can be returned or exchanged within 7 days with this billing receipt. The product must be unused and in original condition.
+      </div>
+    </div>
+  );
+}
+
+export default function NewSale() {
+  const [billNo] = useState(generateBillNo);
+  const [date, setDate] = useState(todayISO);
+  const [customer, setCustomer] = useState("");
+  const [phone, setPhone] = useState("");
+  const [note, setNote] = useState("");
+  const [items, setItems] = useState<SaleItem[]>([{ id: 1, name: "", size: "-", qty: 1, rate: 0 }]);
+  const [success, setSuccess] = useState(false);
+  const [savedSale, setSavedSale] = useState<CompletedSale | null>(null);
+  const nextId = useRef(2);
+  const receiptRef = useRef<HTMLDivElement>(null);
+
+  const total = items.reduce((s, i) => s + i.qty * i.rate, 0);
+
+  const addItem = () => {
+    setItems(prev => [...prev, { id: nextId.current++, name: "", size: "-", qty: 1, rate: 0 }]);
+  };
+
+  const removeItem = (id: number) => {
+    setItems(prev => prev.filter(i => i.id !== id));
+  };
+
+  const updateItem = (id: number, field: keyof SaleItem, value: string | number) => {
+    setItems(prev => prev.map(i => i.id === id ? { ...i, [field]: value } : i));
+  };
+
+  const handleComplete = () => {
+    setSavedSale({ billNo, date, customer, phone, note, items: [...items], total });
+    setSuccess(true);
+  };
+
+  const handlePrint = () => {
+    if (!receiptRef.current) return;
+    const content = receiptRef.current.innerHTML;
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(`
+      <html><head><title>Receipt - ${billNo}</title>
+      <style>
+        body { font-family: monospace; font-size: 11px; max-width: 300px; margin: 0 auto; padding: 16px; }
+        * { box-sizing: border-box; }
+        .flex { display: flex; }
+        .justify-between { justify-content: space-between; }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .font-bold { font-weight: bold; }
+        .border-t { border-top: 1px dashed #888; }
+        .border { border: 1px solid #ccc; }
+        .rounded { border-radius: 4px; }
+        .p-2 { padding: 8px; }
+        .pt-2 { padding-top: 8px; }
+        .mb-2 { margin-bottom: 8px; }
+        .mb-3 { margin-bottom: 12px; }
+        .mt-3 { margin-top: 12px; }
+        .w-8 { width: 2rem; }
+        .w-6 { width: 1.5rem; }
+        .w-20 { width: 5rem; }
+        .flex-\\[2\\] { flex: 2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .space-y-1 > * + * { margin-top: 4px; }
+        .py-0\\.5 { padding: 2px 0; }
+        .py-1 { padding: 4px 0; }
+        .text-base { font-size: 14px; }
+        .text-\\[10px\\] { font-size: 10px; }
+        .leading-relaxed { line-height: 1.6; }
+      </style>
+      </head><body>${content}</body></html>
+    `);
+    win.document.close();
+    win.focus();
+    win.print();
+    win.close();
+  };
+
+  const handleClear = () => {
+    setCustomer("");
+    setPhone("");
+    setNote("");
+    setItems([{ id: nextId.current++, name: "", size: "-", qty: 1, rate: 0 }]);
+    setSuccess(false);
+    setSavedSale(null);
+  };
+
+  const previewItems = success && savedSale ? savedSale.items : items;
+  const previewCustomer = success && savedSale ? savedSale.customer : customer;
+  const previewPhone = success && savedSale ? savedSale.phone : phone;
+  const previewNote = success && savedSale ? savedSale.note : note;
+  const previewBillNo = success && savedSale ? savedSale.billNo : billNo;
+  const previewDate = success && savedSale ? savedSale.date : date;
 
   return (
-    <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Product grid */}
-      <div className="lg:col-span-2 space-y-4">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Select Products</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {PRODUCTS.map(product => (
-            <button
-              key={product.name}
-              onClick={() => addToCart(product)}
-              data-testid={`button-add-${product.name.toLowerCase().replace(/\s+/g, "-")}`}
-              className="group bg-card border border-card-border rounded-xl p-4 text-left hover:border-[hsl(174,72%,40%)] hover:shadow-md transition-all duration-150 active:scale-[0.98]"
-            >
-              <div className="w-8 h-8 rounded-lg bg-[hsl(174,72%,94%)] dark:bg-[hsl(174,72%,20%)] flex items-center justify-center mb-3 group-hover:bg-[hsl(174,72%,40%)] transition-colors">
-                <ShoppingCart className="w-4 h-4 text-[hsl(174,72%,40%)] group-hover:text-white transition-colors" />
-              </div>
-              <p className="text-sm font-semibold text-foreground leading-tight">{product.name}</p>
-              <p className="text-xs text-muted-foreground mt-1">{formatBDT(product.price)}</p>
-            </button>
-          ))}
+    <div className="max-w-6xl mx-auto grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-5">
+      {/* Main form panel */}
+      <div className="bg-card border border-card-border rounded-2xl p-6 shadow-sm">
+        {/* Store info + bill meta */}
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6 pb-5 border-b border-border">
+          <div>
+            <h2 className="text-xl font-bold text-foreground">SD Fashion</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Address: Bonmala Road, Tongi College Gate, Gazipur, Dhaka</p>
+            <p className="text-xs text-muted-foreground">Phone: 01933-479506</p>
+          </div>
+          <div className="space-y-2 sm:text-right min-w-[200px]">
+            <div>
+              <label className="text-xs text-muted-foreground block mb-0.5">Bill No</label>
+              <input
+                type="text"
+                value={billNo}
+                readOnly
+                data-testid="input-bill-no"
+                className="w-full sm:w-44 px-3 py-1.5 text-sm font-mono rounded-lg border border-input bg-muted/50 text-foreground focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground block mb-0.5">Date</label>
+              <input
+                type="date"
+                value={date}
+                onChange={e => setDate(e.target.value)}
+                data-testid="input-date"
+                className="w-full sm:w-44 px-3 py-1.5 text-sm rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] transition"
+              />
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Cart */}
-      <div className="space-y-4">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Cart</h2>
-        <div className="bg-card border border-card-border rounded-2xl p-4 shadow-sm">
-          <div className="space-y-2 mb-4">
-            <label className="text-xs font-medium text-muted-foreground">Customer Name</label>
+        {/* Customer info */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">Customer Name</label>
             <input
               type="text"
               value={customer}
               onChange={e => setCustomer(e.target.value)}
-              placeholder="e.g. Rahul Ahmed"
+              placeholder="Customer name"
               data-testid="input-customer"
               className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] transition"
             />
           </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">Customer Phone <span className="text-muted-foreground/60">(optional)</span></label>
+            <input
+              type="text"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              placeholder="Phone number"
+              data-testid="input-phone"
+              className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] transition"
+            />
+          </div>
+        </div>
 
-          {cart.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
-              <ShoppingCart className="w-8 h-8 text-muted-foreground/40" />
-              <p className="text-sm text-muted-foreground">No items added</p>
-            </div>
-          ) : (
-            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-              {cart.map(item => (
-                <div key={item.name} className="flex items-center gap-2 py-2 border-b border-border last:border-0" data-testid={`cart-item-${item.name.toLowerCase().replace(/\s+/g, "-")}`}>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-foreground truncate">{item.name}</p>
-                    <p className="text-xs text-muted-foreground">{formatBDT(item.price)}</p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => updateQty(item.name, item.qty - 1)}
-                      className="w-6 h-6 rounded-md bg-muted hover:bg-muted-foreground/20 flex items-center justify-center text-sm font-bold text-foreground transition-colors"
-                      data-testid={`button-decrease-${item.name.toLowerCase().replace(/\s+/g, "-")}`}
-                    >−</button>
-                    <span className="w-6 text-center text-xs font-semibold text-foreground">{item.qty}</span>
-                    <button
-                      onClick={() => updateQty(item.name, item.qty + 1)}
-                      className="w-6 h-6 rounded-md bg-muted hover:bg-muted-foreground/20 flex items-center justify-center text-sm font-bold text-foreground transition-colors"
-                      data-testid={`button-increase-${item.name.toLowerCase().replace(/\s+/g, "-")}`}
-                    >+</button>
-                  </div>
-                  <button
-                    onClick={() => removeFromCart(item.name)}
-                    data-testid={`button-remove-${item.name.toLowerCase().replace(/\s+/g, "-")}`}
-                    className="p-1 rounded-lg text-destructive hover:bg-destructive/10 transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+        {/* Note */}
+        <div className="mb-5">
+          <label className="text-xs font-medium text-muted-foreground mb-1 block">Note</label>
+          <textarea
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            rows={2}
+            placeholder="+"
+            data-testid="input-note"
+            className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] resize-none transition"
+          />
+        </div>
+
+        {/* Items table */}
+        <div className="mb-4">
+          {/* Header */}
+          <div className="grid grid-cols-[1fr_90px_80px_110px_120px_36px] gap-2 px-1 mb-1">
+            {["Item", "Size", "Qty", "Rate", "Amount", ""].map(h => (
+              <span key={h} className="text-xs font-semibold text-muted-foreground">{h}</span>
+            ))}
+          </div>
+
+          <div className="space-y-2">
+            {items.map((item, idx) => (
+              <div key={item.id} className="grid grid-cols-[1fr_90px_80px_110px_120px_36px] gap-2 items-center" data-testid={`row-item-${idx}`}>
+                <input
+                  type="text"
+                  value={item.name}
+                  onChange={e => updateItem(item.id, "name", e.target.value)}
+                  placeholder="Item name"
+                  data-testid={`input-item-name-${idx}`}
+                  className="px-3 py-2 rounded-lg border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] transition"
+                />
+                <select
+                  value={item.size}
+                  onChange={e => updateItem(item.id, "size", e.target.value)}
+                  data-testid={`select-size-${idx}`}
+                  className="px-2 py-2 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] transition"
+                >
+                  {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <input
+                  type="number"
+                  value={item.qty}
+                  min={1}
+                  onChange={e => updateItem(item.id, "qty", Math.max(1, parseInt(e.target.value) || 1))}
+                  data-testid={`input-qty-${idx}`}
+                  className="px-3 py-2 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] text-center transition"
+                />
+                <input
+                  type="number"
+                  value={item.rate || ""}
+                  min={0}
+                  placeholder="0"
+                  onChange={e => updateItem(item.id, "rate", parseFloat(e.target.value) || 0)}
+                  data-testid={`input-rate-${idx}`}
+                  className="px-3 py-2 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] transition"
+                />
+                <div className="px-3 py-2 rounded-lg border border-border bg-muted/40 text-sm font-semibold text-foreground" data-testid={`text-amount-${idx}`}>
+                  {formatBDT(item.qty * item.rate)}
                 </div>
-              ))}
-            </div>
-          )}
-
-          <div className="mt-4 space-y-3">
-            <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">Payment Method</label>
-              <div className="flex gap-2">
-                {(["Cash", "Card", "Mobile"] as const).map(m => (
-                  <button
-                    key={m}
-                    onClick={() => setPayment(m)}
-                    data-testid={`button-payment-${m.toLowerCase()}`}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                      payment === m
-                        ? "bg-[hsl(174,72%,40%)] text-white"
-                        : "bg-muted text-muted-foreground hover:bg-muted-foreground/20"
-                    }`}
-                  >
-                    {m}
-                  </button>
-                ))}
+                <button
+                  onClick={() => removeItem(item.id)}
+                  disabled={items.length === 1}
+                  data-testid={`button-remove-item-${idx}`}
+                  className="w-9 h-9 flex items-center justify-center rounded-lg bg-[hsl(0,84%,60%)] hover:bg-[hsl(0,84%,50%)] disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-            </div>
+            ))}
+          </div>
 
-            <div className="flex items-center justify-between py-2 border-t border-border">
-              <span className="text-sm font-medium text-muted-foreground">Total</span>
-              <span className="text-base font-extrabold text-foreground" data-testid="text-cart-total">{formatBDT(total)}</span>
-            </div>
+          <button
+            onClick={addItem}
+            data-testid="button-add-item"
+            className="mt-3 flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[hsl(221,83%,53%)] hover:bg-[hsl(221,83%,45%)] text-white text-sm font-semibold transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add Item
+          </button>
+        </div>
 
+        {/* Total + Actions */}
+        <div className="border-t border-border pt-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-base font-bold text-foreground">Total</span>
+            <span className="text-lg font-extrabold text-foreground" data-testid="text-total">{formatBDT(total)}</span>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
             <button
-              onClick={handleSubmit}
-              disabled={cart.length === 0}
+              onClick={handleComplete}
               data-testid="button-complete-sale"
-              className="w-full py-2.5 rounded-xl bg-[hsl(174,72%,40%)] hover:bg-[hsl(174,72%,35%)] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm transition-colors flex items-center justify-center gap-2"
+              className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-[hsl(174,72%,40%)] hover:bg-[hsl(174,72%,34%)] text-white font-semibold text-sm transition-colors"
             >
-              <Plus className="w-4 h-4" />
               Complete Sale
             </button>
+            <button
+              onClick={handlePrint}
+              data-testid="button-print-bill"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-[hsl(221,83%,53%)] hover:bg-[hsl(221,83%,45%)] text-white font-semibold text-sm transition-colors"
+            >
+              <Printer className="w-4 h-4" />
+              Print Bill
+            </button>
+            <button
+              onClick={handleClear}
+              data-testid="button-clear"
+              className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl border border-border bg-card hover:bg-muted text-foreground font-semibold text-sm transition-colors"
+            >
+              Clear
+            </button>
           </div>
+
+          {success && (
+            <div className="px-4 py-3 rounded-xl bg-[hsl(174,72%,94%)] dark:bg-[hsl(174,72%,20%)] border border-[hsl(174,72%,75%)] dark:border-[hsl(174,72%,35%)] text-[hsl(174,72%,28%)] dark:text-[hsl(174,72%,70%)] text-sm font-semibold">
+              Sale recorded successfully!
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Receipt preview */}
+      <div className="bg-card border border-card-border rounded-2xl shadow-sm overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-border bg-[hsl(221,83%,53%)]">
+          <h3 className="text-sm font-bold text-white">Receipt Preview</h3>
+        </div>
+        <div className="p-4" ref={receiptRef}>
+          <ReceiptPreview
+            billNo={previewBillNo}
+            date={previewDate}
+            customer={previewCustomer}
+            phone={previewPhone}
+            items={previewItems}
+            note={previewNote}
+          />
         </div>
       </div>
     </div>
