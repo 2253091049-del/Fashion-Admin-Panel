@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { CalendarDays, ShoppingBag, TrendingUp, Calendar } from "lucide-react";
+import { useState, useMemo } from "react";
+import { CalendarDays, ShoppingBag, TrendingUp, Calendar, ChevronLeft, ChevronRight, X } from "lucide-react";
 import {
   useGetTodaySummary,
   useGetMonthSummary,
@@ -20,26 +20,23 @@ function formatBDT(amount: number) {
   return `BDT ${Number(amount).toLocaleString("en-BD", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function SummaryCard({
-  title,
-  amount,
-  count,
-  icon: Icon,
-  iconBg,
-  isLoading,
-}: {
-  title: string;
-  amount: number;
-  count: number;
-  icon: React.ElementType;
-  iconBg: string;
-  isLoading?: boolean;
+function pad(n: number) { return String(n).padStart(2, "0"); }
+
+interface SaleType {
+  id: number;
+  billNo: string;
+  date: string;
+  customer: string;
+  total: number;
+  items: { name: string; size: string; qty: number; rate: number; amount: number }[];
+}
+
+function SummaryCard({ title, amount, count, icon: Icon, iconBg, isLoading }: {
+  title: string; amount: number; count: number;
+  icon: React.ElementType; iconBg: string; isLoading?: boolean;
 }) {
   return (
-    <div
-      className="bg-card border border-card-border rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow duration-200"
-      data-testid={`card-${title.toLowerCase().replace(/\s+/g, "-")}`}
-    >
+    <div className="bg-card border border-card-border rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow duration-200">
       <div className="flex items-start gap-4">
         <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg}`}>
           <Icon className="w-5 h-5 text-white" />
@@ -49,11 +46,9 @@ function SummaryCard({
           {isLoading ? (
             <div className="h-8 w-32 bg-muted animate-pulse rounded-lg mb-1" />
           ) : (
-            <p className="text-2xl font-extrabold text-foreground tracking-tight" data-testid={`text-amount-${title.toLowerCase().replace(/\s+/g, "-")}`}>
-              {formatBDT(amount)}
-            </p>
+            <p className="text-2xl font-extrabold text-foreground tracking-tight">{formatBDT(amount)}</p>
           )}
-          <p className="text-xs text-muted-foreground mt-1" data-testid={`text-count-${title.toLowerCase().replace(/\s+/g, "-")}`}>
+          <p className="text-xs text-muted-foreground mt-1">
             {isLoading ? "..." : `${count} ${count === 1 ? "sale" : "sales"}`}
           </p>
         </div>
@@ -62,10 +57,222 @@ function SummaryCard({
   );
 }
 
-const MONTHS = [
-  "January","February","March","April","May","June",
-  "July","August","September","October","November","December",
-];
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const SHORT_MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const DAY_LABELS = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+
+function CalendarSection({ allSales }: { allSales: SaleType[] }) {
+  const now = new Date();
+  const [calYear, setCalYear] = useState(now.getFullYear());
+  const [calMonth, setCalMonth] = useState(now.getMonth());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
+  const salesByDate = useMemo(() => {
+    const map: Record<string, SaleType[]> = {};
+    for (const sale of allSales) {
+      if (!map[sale.date]) map[sale.date] = [];
+      map[sale.date].push(sale);
+    }
+    return map;
+  }, [allSales]);
+
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+  const prevMonth = () => {
+    if (calMonth === 0) { setCalYear(y => y - 1); setCalMonth(11); }
+    else setCalMonth(m => m - 1);
+    setSelectedDate(null);
+  };
+  const nextMonth = () => {
+    if (calMonth === 11) { setCalYear(y => y + 1); setCalMonth(0); }
+    else setCalMonth(m => m + 1);
+    setSelectedDate(null);
+  };
+
+  const selectedSales = selectedDate ? (salesByDate[selectedDate] ?? []) : [];
+  const selectedTotal = selectedSales.reduce((s, sale) => s + sale.total, 0);
+
+  const cells: (number | null)[] = [
+    ...Array(firstDay).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  return (
+    <div className="bg-card border border-card-border rounded-2xl shadow-sm overflow-hidden">
+      <div className="px-5 py-4 border-b border-border">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+            <CalendarDays className="w-4 h-4 text-[hsl(221,83%,53%)]" />
+            Sales Calendar
+          </h2>
+          <div className="flex items-center gap-2">
+            <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-sm font-semibold text-foreground min-w-[110px] text-center">
+              {MONTHS[calMonth]} {calYear}
+            </span>
+            <button onClick={nextMonth} className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4">
+        <div className="grid grid-cols-7 mb-1">
+          {DAY_LABELS.map(d => (
+            <div key={d} className="text-center text-[11px] font-semibold text-muted-foreground py-1">{d}</div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-0.5">
+          {cells.map((day, i) => {
+            if (!day) return <div key={i} />;
+            const dateStr = `${calYear}-${pad(calMonth + 1)}-${pad(day)}`;
+            const hasSales = !!salesByDate[dateStr];
+            const dayTotal = hasSales ? salesByDate[dateStr].reduce((s, sale) => s + sale.total, 0) : 0;
+            const isToday = dateStr === todayStr;
+            const isSelected = dateStr === selectedDate;
+
+            return (
+              <button
+                key={i}
+                onClick={() => setSelectedDate(isSelected ? null : dateStr)}
+                className={`relative flex flex-col items-center justify-center rounded-lg py-1.5 text-xs font-medium transition-all duration-150 min-h-[44px]
+                  ${isSelected
+                    ? "bg-[hsl(174,72%,40%)] text-white shadow-md"
+                    : isToday
+                      ? "bg-[hsl(221,83%,53%)] text-white"
+                      : hasSales
+                        ? "bg-[hsl(174,72%,94%)] dark:bg-[hsl(174,72%,18%)] text-[hsl(174,72%,28%)] dark:text-[hsl(174,72%,70%)] hover:bg-[hsl(174,72%,85%)] dark:hover:bg-[hsl(174,72%,24%)]"
+                        : "text-foreground hover:bg-muted"
+                  }`}
+              >
+                <span>{day}</span>
+                {hasSales && !isSelected && (
+                  <span className={`text-[9px] font-bold mt-0.5 ${isToday ? "text-white/80" : "text-[hsl(174,72%,40%)] dark:text-[hsl(174,72%,60%)]"}`}>
+                    {dayTotal >= 1000 ? `${(dayTotal / 1000).toFixed(1)}k` : dayTotal.toFixed(0)}
+                  </span>
+                )}
+                {hasSales && (
+                  <span className={`absolute top-1 right-1 w-1.5 h-1.5 rounded-full ${isSelected || isToday ? "bg-white/70" : "bg-[hsl(174,72%,40%)]"}`} />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Selected date sales panel */}
+        {selectedDate && (
+          <div className="mt-4 border-t border-border pt-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-sm font-bold text-foreground">{selectedDate}</p>
+                <p className="text-xs text-muted-foreground">{selectedSales.length} sale{selectedSales.length !== 1 ? "s" : ""} · {formatBDT(selectedTotal)}</p>
+              </div>
+              <button onClick={() => setSelectedDate(null)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {selectedSales.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-3">No sales on this date</p>
+            ) : (
+              <div className="space-y-2 max-h-52 overflow-y-auto">
+                {selectedSales.map(sale => (
+                  <div key={sale.id} className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-background border border-border">
+                    <div>
+                      <p className="text-xs font-semibold text-foreground">{sale.billNo}</p>
+                      <p className="text-[11px] text-muted-foreground">{sale.customer} · {sale.items.length} item{sale.items.length !== 1 ? "s" : ""}</p>
+                    </div>
+                    <span className="text-sm font-extrabold text-foreground">{formatBDT(sale.total)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Legend */}
+        <div className="mt-3 flex items-center gap-4 text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm bg-[hsl(221,83%,53%)]" />
+            Today
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm bg-[hsl(174,72%,94%)] dark:bg-[hsl(174,72%,18%)]" />
+            Has sales
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm bg-[hsl(174,72%,40%)]" />
+            Selected
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DailySalesReport({ sales }: { sales: SaleType[] }) {
+  const today = useMemo(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  }, []);
+
+  const todaySales = sales.filter(s => s.date === today);
+  const total = todaySales.reduce((s, sale) => s + sale.total, 0);
+
+  return (
+    <div className="bg-card border border-card-border rounded-2xl shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+        <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+          <ShoppingBag className="w-4 h-4 text-[hsl(174,72%,40%)]" />
+          Today's Sales Report
+        </h2>
+        {todaySales.length > 0 && (
+          <span className="text-sm font-extrabold text-[hsl(174,72%,40%)]">{formatBDT(total)}</span>
+        )}
+      </div>
+
+      {todaySales.length === 0 ? (
+        <div className="px-5 py-10 text-center text-sm text-muted-foreground">
+          No sales recorded today yet
+        </div>
+      ) : (
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-border">
+              <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">Bill No</th>
+              <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">Customer</th>
+              <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">Items</th>
+              <th className="px-4 py-2.5 text-right text-xs font-semibold text-muted-foreground">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {todaySales.map((sale, i) => (
+              <tr key={sale.id} className={`${i < todaySales.length - 1 ? "border-b border-border/60" : ""} hover:bg-muted/30 transition-colors`}>
+                <td className="px-4 py-2.5 text-xs font-mono text-muted-foreground">{sale.billNo}</td>
+                <td className="px-4 py-2.5 text-sm font-medium text-foreground">{sale.customer}</td>
+                <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                  {sale.items.map(it => it.name).join(", ") || "—"}
+                </td>
+                <td className="px-4 py-2.5 text-sm font-bold text-foreground text-right">{formatBDT(sale.total)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="border-t border-border bg-muted/20">
+              <td colSpan={3} className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">{todaySales.length} transaction{todaySales.length !== 1 ? "s" : ""}</td>
+              <td className="px-4 py-2.5 text-sm font-extrabold text-foreground text-right">{formatBDT(total)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      )}
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const now = new Date();
@@ -79,21 +286,24 @@ export default function Dashboard() {
     { year: selectedYear },
     { query: { queryKey: ["monthly-totals", selectedYear] } }
   );
-  const { data: reportSales } = useListSales(
+  const { data: reportSales = [] } = useListSales(
     { year: selectedYear, month: selectedMonth },
     { query: { queryKey: ["sales", selectedYear, selectedMonth] } }
   );
+  const { data: allSales = [] } = useListSales(
+    { year: selectedYear },
+    { query: { queryKey: ["sales-year", selectedYear] } }
+  );
 
-  const reportTotal = (reportSales ?? []).reduce((s, sale) => s + sale.total, 0);
+  const reportTotal = reportSales.reduce((s, sale) => s + sale.total, 0);
   const reportMonthLabel = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
   const selectedMonthName = MONTHS[selectedMonth - 1];
 
-  const chartData = chartLoading
-    ? []
-    : (monthlyTotals ?? []).map(m => ({ month: m.month, total: m.total }));
+  const chartData = chartLoading ? [] : (monthlyTotals ?? []).map(m => ({ month: m.month, total: m.total }));
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
+    <div className="space-y-5 max-w-6xl mx-auto">
+      {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <SummaryCard
           title="Today Sales"
@@ -113,6 +323,13 @@ export default function Dashboard() {
         />
       </div>
 
+      {/* Today's sales report + Calendar side by side */}
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-5">
+        <DailySalesReport sales={allSales as SaleType[]} />
+        <CalendarSection allSales={allSales as SaleType[]} />
+      </div>
+
+      {/* Monthly report + chart */}
       <div className="bg-card border border-card-border rounded-2xl p-6 shadow-sm">
         <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
           <h2 className="text-base font-semibold text-foreground">Monthly Sales Report</h2>
@@ -145,7 +362,7 @@ export default function Dashboard() {
                             : "text-muted-foreground hover:bg-muted hover:text-foreground"
                         }`}
                       >
-                        {m.slice(0, 3)}
+                        {SHORT_MONTHS[i]}
                       </button>
                     );
                   })}
@@ -156,39 +373,27 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-          <div
-            className="bg-background border border-border rounded-xl p-5 hover:shadow-sm transition-shadow duration-150"
-            data-testid="card-report-total"
-          >
+          <div className="bg-background border border-border rounded-xl p-5">
             <div className="flex items-start gap-3">
               <div className="w-9 h-9 rounded-lg bg-[hsl(174,72%,94%)] dark:bg-[hsl(174,72%,20%)] flex items-center justify-center flex-shrink-0">
                 <ShoppingBag className="w-4 h-4 text-[hsl(174,72%,40%)]" />
               </div>
               <div>
                 <p className="text-xs font-medium text-muted-foreground mb-1">Report Total</p>
-                <p className="text-xl font-extrabold text-foreground tracking-tight" data-testid="text-report-total">
-                  {formatBDT(reportTotal)}
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-report-count">
-                  {(reportSales ?? []).length} sales
-                </p>
+                <p className="text-xl font-extrabold text-foreground tracking-tight">{formatBDT(reportTotal)}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{reportSales.length} sales</p>
               </div>
             </div>
           </div>
 
-          <div
-            className="bg-background border border-border rounded-xl p-5 hover:shadow-sm transition-shadow duration-150"
-            data-testid="card-report-month"
-          >
+          <div className="bg-background border border-border rounded-xl p-5">
             <div className="flex items-start gap-3">
               <div className="w-9 h-9 rounded-lg bg-[hsl(221,83%,94%)] dark:bg-[hsl(221,83%,20%)] flex items-center justify-center flex-shrink-0">
                 <CalendarDays className="w-4 h-4 text-[hsl(221,83%,53%)]" />
               </div>
               <div>
                 <p className="text-xs font-medium text-muted-foreground mb-1">Report Month</p>
-                <p className="text-xl font-extrabold text-foreground tracking-tight" data-testid="text-report-month">
-                  {reportMonthLabel}
-                </p>
+                <p className="text-xl font-extrabold text-foreground tracking-tight">{reportMonthLabel}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">Selected month</p>
               </div>
             </div>

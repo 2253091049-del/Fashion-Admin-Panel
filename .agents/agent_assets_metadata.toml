@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "iytDBB9cLHPmFmNcDq2JH"
+uri = "file://downloads/sd-fashion-project.zip"
+type = "unspecified"
+title = "SD Fashion Dashboard — Source Code"

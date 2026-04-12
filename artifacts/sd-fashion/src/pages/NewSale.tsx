@@ -1,11 +1,12 @@
 import { useState, useRef } from "react";
-import { Plus, Trash2, Printer, X } from "lucide-react";
-import { useCreateSale } from "@workspace/api-client-react";
+import { Plus, Printer, X } from "lucide-react";
+import { useCreateSale, useListProducts } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetTodaySummaryQueryKey, getGetMonthSummaryQueryKey, getGetMonthlyTotalsQueryKey, getListSalesQueryKey } from "@workspace/api-client-react";
 
 interface SaleItem {
   id: number;
+  productId: number | null;
   name: string;
   size: string;
   qty: number;
@@ -90,13 +91,14 @@ function ReceiptPreview({ billNo, date, customer, phone, items, note }: {
 export default function NewSale() {
   const queryClient = useQueryClient();
   const createSale = useCreateSale();
+  const { data: products = [] } = useListProducts();
 
   const [billNo] = useState(generateBillNo);
   const [date, setDate] = useState(todayISO);
   const [customer, setCustomer] = useState("");
   const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
-  const [items, setItems] = useState<SaleItem[]>([{ id: 1, name: "", size: "-", qty: 1, rate: 0 }]);
+  const [items, setItems] = useState<SaleItem[]>([{ id: 1, productId: null, name: "", size: "-", qty: 1, rate: 0 }]);
   const [savedSale, setSavedSale] = useState<{ billNo: string; date: string; customer: string; phone: string; note: string; items: SaleItem[] } | null>(null);
   const nextId = useRef(2);
   const receiptRef = useRef<HTMLDivElement>(null);
@@ -104,14 +106,28 @@ export default function NewSale() {
   const total = items.reduce((s, i) => s + i.qty * i.rate, 0);
 
   const addItem = () => {
-    setItems(prev => [...prev, { id: nextId.current++, name: "", size: "-", qty: 1, rate: 0 }]);
+    setItems(prev => [...prev, { id: nextId.current++, productId: null, name: "", size: "-", qty: 1, rate: 0 }]);
   };
 
   const removeItem = (id: number) => {
     setItems(prev => prev.filter(i => i.id !== id));
   };
 
-  const updateItem = (id: number, field: keyof SaleItem, value: string | number) => {
+  const handleProductSelect = (itemId: number, productId: string) => {
+    if (productId === "") {
+      setItems(prev => prev.map(i => i.id === itemId ? { ...i, productId: null, name: "", size: "-", rate: 0 } : i));
+      return;
+    }
+    const pid = parseInt(productId);
+    const product = products.find(p => p.id === pid);
+    if (product) {
+      setItems(prev => prev.map(i =>
+        i.id === itemId ? { ...i, productId: pid, name: product.name, size: product.size, rate: product.price } : i
+      ));
+    }
+  };
+
+  const updateItem = (id: number, field: keyof SaleItem, value: string | number | null) => {
     setItems(prev => prev.map(i => i.id === id ? { ...i, [field]: value } : i));
   };
 
@@ -170,7 +186,7 @@ export default function NewSale() {
     setCustomer("");
     setPhone("");
     setNote("");
-    setItems([{ id: nextId.current++, name: "", size: "-", qty: 1, rate: 0 }]);
+    setItems([{ id: nextId.current++, productId: null, name: "", size: "-", qty: 1, rate: 0 }]);
     setSavedSale(null);
   };
 
@@ -224,27 +240,47 @@ export default function NewSale() {
 
         {/* Items */}
         <div className="mb-4">
-          <div className="grid grid-cols-[1fr_90px_80px_110px_120px_36px] gap-2 px-1 mb-1">
-            {["Item", "Size", "Qty", "Rate", "Amount", ""].map(h => (
+          <div className="hidden md:grid grid-cols-[1fr_90px_80px_110px_120px_36px] gap-2 px-1 mb-1">
+            {["Product", "Size", "Qty", "Rate (BDT)", "Amount", ""].map(h => (
               <span key={h} className="text-xs font-semibold text-muted-foreground">{h}</span>
             ))}
           </div>
+
           <div className="space-y-2">
             {items.map((item, idx) => (
               <div key={item.id} className="grid grid-cols-[1fr_90px_80px_110px_120px_36px] gap-2 items-center" data-testid={`row-item-${idx}`}>
-                <input type="text" value={item.name} onChange={e => updateItem(item.id, "name", e.target.value)} placeholder="Item name" data-testid={`input-item-name-${idx}`}
-                  className="px-3 py-2 rounded-lg border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] transition" />
+
+                {/* Product dropdown */}
+                <select
+                  value={item.productId ?? ""}
+                  onChange={e => handleProductSelect(item.id, e.target.value)}
+                  data-testid={`select-product-${idx}`}
+                  className="px-3 py-2 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] transition"
+                >
+                  <option value="">— Select product —</option>
+                  {products.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} {p.size !== "-" ? `(${p.size})` : ""}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Size override */}
                 <select value={item.size} onChange={e => updateItem(item.id, "size", e.target.value)} data-testid={`select-size-${idx}`}
                   className="px-2 py-2 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] transition">
                   {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
+
                 <input type="number" value={item.qty} min={1} onChange={e => updateItem(item.id, "qty", Math.max(1, parseInt(e.target.value) || 1))} data-testid={`input-qty-${idx}`}
                   className="px-3 py-2 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] text-center transition" />
+
                 <input type="number" value={item.rate || ""} min={0} placeholder="0" onChange={e => updateItem(item.id, "rate", parseFloat(e.target.value) || 0)} data-testid={`input-rate-${idx}`}
                   className="px-3 py-2 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] transition" />
+
                 <div className="px-3 py-2 rounded-lg border border-border bg-muted/40 text-sm font-semibold text-foreground" data-testid={`text-amount-${idx}`}>
                   {formatBDT(item.qty * item.rate)}
                 </div>
+
                 <button onClick={() => removeItem(item.id)} disabled={items.length === 1} data-testid={`button-remove-item-${idx}`}
                   className="w-9 h-9 flex items-center justify-center rounded-lg bg-[hsl(0,84%,60%)] hover:bg-[hsl(0,84%,50%)] disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors">
                   <X className="w-4 h-4" />
@@ -252,6 +288,13 @@ export default function NewSale() {
               </div>
             ))}
           </div>
+
+          {products.length === 0 && (
+            <p className="mt-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+              No products in inventory. Add products in the Products section first.
+            </p>
+          )}
+
           <button onClick={addItem} data-testid="button-add-item"
             className="mt-3 flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[hsl(221,83%,53%)] hover:bg-[hsl(221,83%,45%)] text-white text-sm font-semibold transition-colors">
             <Plus className="w-4 h-4" />Add Item
@@ -279,7 +322,7 @@ export default function NewSale() {
           </div>
           {savedSale && (
             <div className="px-4 py-3 rounded-xl bg-[hsl(174,72%,94%)] dark:bg-[hsl(174,72%,20%)] border border-[hsl(174,72%,75%)] dark:border-[hsl(174,72%,35%)] text-[hsl(174,72%,28%)] dark:text-[hsl(174,72%,70%)] text-sm font-semibold">
-              Sale saved to database successfully!
+              Sale saved successfully!
             </div>
           )}
           {createSale.isError && (
