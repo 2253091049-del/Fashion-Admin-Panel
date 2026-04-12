@@ -12,6 +12,8 @@ tags:
     description: Health operations
   - name: sales
     description: Sales operations
+  - name: products
+    description: Product inventory operations
 paths:
   /healthz:
     get:
@@ -144,6 +146,82 @@ paths:
       operationId: deleteSale
       tags: [sales]
       summary: Delete a sale
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  /products:
+    get:
+      operationId: listProducts
+      tags: [products]
+      summary: List all products
+      responses:
+        "200":
+          description: List of products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+    post:
+      operationId: createProduct
+      tags: [products]
+      summary: Create a product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductBody"
+      responses:
+        "201":
+          description: Created product
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "400":
+          description: Validation error
+
+  /products/{id}:
+    put:
+      operationId: updateProduct
+      tags: [products]
+      summary: Update a product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductBody"
+      responses:
+        "200":
+          description: Updated product
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteProduct
+      tags: [products]
+      summary: Delete a product
       parameters:
         - name: id
           in: path
@@ -296,3 +374,49 @@ components:
         - month
         - total
         - count
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        category:
+          type: string
+        size:
+          type: string
+        price:
+          type: number
+        stock:
+          type: integer
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - category
+        - size
+        - price
+        - stock
+        - createdAt
+
+    CreateProductBody:
+      type: object
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        size:
+          type: string
+        price:
+          type: number
+        stock:
+          type: integer
+      required:
+        - name
+        - category
+        - size
+        - price
+        - stock

@@ -64,6 +64,24 @@ export interface MonthlyTotal {
   count: number;
 }
 
+export interface Product {
+  id: number;
+  name: string;
+  category: string;
+  size: string;
+  price: number;
+  stock: number;
+  createdAt: string;
+}
+
+export interface CreateProductBody {
+  name: string;
+  category: string;
+  size: string;
+  price: number;
+  stock: number;
+}
+
 export type ListSalesParams = {
   year?: number;
   month?: number;

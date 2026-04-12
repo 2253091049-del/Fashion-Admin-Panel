@@ -134,3 +134,60 @@ export const GetSaleResponse = zod.object({
 export const DeleteSaleParams = zod.object({
   id: zod.coerce.number(),
 });
+
+/**
+ * @summary List all products
+ */
+export const ListProductsResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  category: zod.string(),
+  size: zod.string(),
+  price: zod.number(),
+  stock: zod.number(),
+  createdAt: zod.string(),
+});
+export const ListProductsResponse = zod.array(ListProductsResponseItem);
+
+/**
+ * @summary Create a product
+ */
+export const CreateProductBody = zod.object({
+  name: zod.string(),
+  category: zod.string(),
+  size: zod.string(),
+  price: zod.number(),
+  stock: zod.number(),
+});
+
+/**
+ * @summary Update a product
+ */
+export const UpdateProductParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateProductBody = zod.object({
+  name: zod.string(),
+  category: zod.string(),
+  size: zod.string(),
+  price: zod.number(),
+  stock: zod.number(),
+});
+
+export const UpdateProductResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  category: zod.string(),
+  size: zod.string(),
+  price: zod.number(),
+  stock: zod.number(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Delete a product
+ */
+export const DeleteProductParams = zod.object({
+  id: zod.coerce.number(),
+});

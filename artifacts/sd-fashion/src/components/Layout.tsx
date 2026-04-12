@@ -12,12 +12,14 @@ import {
   Moon,
   Menu,
   X,
+  Package,
 } from "lucide-react";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
   { path: "/new-sale", label: "New Sale", icon: ShoppingCart },
   { path: "/sales-history", label: "Sales History", icon: History },
+  { path: "/products", label: "Products", icon: Package },
 ];
 
 function Sidebar({ onClose }: { onClose?: () => void }) {
@@ -114,12 +116,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      {/* Desktop sidebar */}
       <div className="hidden lg:flex flex-shrink-0">
         <Sidebar />
       </div>
 
-      {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div
@@ -132,9 +132,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Top navbar */}
         <header className="flex items-center justify-between px-6 py-4 bg-card border-b border-border flex-shrink-0">
           <div className="flex items-center gap-4">
             <button
@@ -151,7 +149,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </span>
         </header>
 
-        {/* Page content */}
         <main className="flex-1 overflow-y-auto p-6">
           {children}
         </main>
