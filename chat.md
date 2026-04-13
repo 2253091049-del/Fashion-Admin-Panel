@@ -234,3 +234,52 @@ sqlite addon rebuild
 নতুন .exe build  
 product save fully working version দিয়ে দেব
 এখন যদি বলো “complete”, আমি সাথে সাথে next command চালাই।
+|
+|
+>>>>>
+Also add chat for helping build 
+
+You are right, instead of full Visual Studio, only C++ Build Tools are needed to compile better-sqlite3; I am now installing that properly so this error does not occur again.
+
+winget install --id Microsoft.VisualStudio.2022.BuildTools -e --silent --accept-package-agreements --accept-source-agreements --override "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --passive --norestart"
+
+Good news, Build Tools are already installed. Now I am directly rebuilding the sqlite module and creating a new installer.
+
+I found the reason: Build Tools are available, but the VC++ toolset is not installed. Now I am modifying the installer to add the missing C++ components, then I will run the rebuild again.
+
+I am rerunning the rebuild command cleanly; the previous one got mixed with the VS installer output.
+
+Now it is clear: VS Build Tools exist, but the VC++ toolset component is not installed. I am adding the workload using the installer, this will unblock the rebuild.
+
+The terminal got interrupted, I am running the component add command in non-interactive mode so it completes silently.
+
+Now progress is clear: VC++ toolset is detected, only Windows SDK is missing. I am adding the SDK component now; after this the rebuild will complete.
+
+Now status is found: Build Tools installation is still incomplete (isComplete: 0). That is why the rebuild is failing. I am now resuming the installer to complete the installation.
+
+The installer is running in the background (setup process active), so commands were getting interrupted. I will verify completion and then finish the rebuild step.
+
+Yes, now only one blocker remains:
+
+Python is fixed
+VC++ toolset is detected
+But Build Tools installation is still incomplete (isComplete: 0)
+Windows SDK is missing, so better-sqlite3 cannot compile
+That is why Products save is failing
+
+I have resumed the installation, but the setup process is still running in the background.
+
+Now what you need to do (one time):
+
+Open Visual Studio Installer and go to Build Tools 2022 and click Modify
+Tick Desktop development with C++ workload
+Make sure Windows 10/11 SDK component is selected
+Wait until installation is fully complete (status must be complete)
+
+Once installation is complete, I will immediately:
+
+Rebuild sqlite addon
+Create new .exe build
+Give you a fully working version where product save works
+
+Now if you say “complete”, I will run the next command immediately.
