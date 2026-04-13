@@ -201,3 +201,36 @@
 - Restarted app -> product still exists.
 - Edited existing product -> changes persisted after refresh/restart.
 - Confirmed backend process starts without sqlite binding error in logs.
+
+
+
+Full Conversation Log (Build Tools & better-sqlite3 Fix)
+You are right — instead of full Visual Studio, only the C++ Build Tools are needed to compile better-sqlite3. I am installing that properly now so this error does not happen again.
+```bash
+winget install --id Microsoft.VisualStudio.2022.BuildTools -e --silent --accept-package-agreements --accept-source-agreements --override "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --passive --norestart"
+```
+Good news: Build Tools are already installed. Now I am directly rebuilding the sqlite module and creating a new installer.
+Found the issue: Build Tools are installed, but the VC++ toolset is missing. I am modifying the installer to add the missing C++ components, then I will run the rebuild again.
+I am rerunning the rebuild command cleanly; the previous one got mixed with VS installer output.
+Now it is clear: VS Build Tools exist, but the VC++ toolset component is not installed. I am adding the workload via the installer — this will unblock the rebuild.
+The terminal was interrupted, so I am running the component add command in non-interactive mode to complete silently.
+Progress update: VC++ toolset is now detected, but the Windows SDK is missing. I am adding the SDK component now; after that, the rebuild should complete.
+Current status: Build Tools installation is still incomplete (isComplete: 0). That is why the rebuild is failing. I am resuming the installer to complete the installation.
+The installer is running in the background (setup process active), which was interrupting commands. I will verify completion and then finish the rebuild step.
+Yes — only one blocker remains now:
+Python is fixed  
+VC++ toolset is detected  
+But Build Tools installation is still incomplete (isComplete: 0)  
+Windows SDK is missing, so better-sqlite3 cannot compile  
+That is why saving products is failing
+I have resumed the installation, but the setup process is still running in the background.
+Now what you need to do (just once):
+Visual Studio Installer খুলে Build Tools 2022 এ গিয়ে Modify করো  
+Desktop development with C++ workload tick করো  
+Windows 10/11 SDK component নিশ্চিত করো  
+Install complete হওয়া পর্যন্ত wait করো (status complete হতে হবে)
+Install complete হলেই আমি সাথে সাথে:
+sqlite addon rebuild  
+নতুন .exe build  
+product save fully working version দিয়ে দেব
+এখন যদি বলো “complete”, আমি সাথে সাথে next command চালাই।
