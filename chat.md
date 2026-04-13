@@ -146,3 +146,58 @@
 - Backend uses local SQLite file stored in user AppData folder.
 - Installer now includes all required assets and native sqlite binary.
 - Hash routing fixes 404 in packaged app.
+
+## Last Portion: Products Not Saving -> Fixed
+
+### Problem Reported
+- In the Products section, adding/updating products was not being saved reliably.
+- After app restart, newly added products were missing in some runs.
+
+### Root Cause
+- The backend persistence layer had already been moved to SQLite, but in packaged desktop runs the backend process sometimes failed to load the native `better-sqlite3` binding.
+- When native sqlite binding is missing, DB operations fail at runtime, so Product create/update calls do not persist.
+- In addition, product route handling needed sqlite-safe parsing/typing so payload values map cleanly into sqlite columns.
+
+### What I Changed (Exact Work Done)
+1. Database layer switched and stabilized for SQLite:
+	- Replaced PostgreSQL-oriented schema usage with sqlite-core schema in shared DB package.
+	- Updated DB client usage to `better-sqlite3` and ensured DB/tables initialize on startup.
+2. Product API route hardening:
+	- Updated product route logic to parse request values in SQLite-compatible way.
+	- Ensured insert/update payload handling matches sqlite column expectations.
+3. Desktop packaging/runtime fixes for DB availability:
+	- Rebuilt `better-sqlite3` against Electron runtime.
+	- Copied rebuilt native sqlite package into packaged backend `node_modules`.
+	- Copied helper deps required by sqlite binding resolution.
+	- Started backend with `NODE_PATH` configured so packaged module resolution works.
+4. Build toolchain setup required for native sqlite:
+	- Installed Python and Visual Studio Build Tools (C++ workload + Windows SDK).
+	- Reason: `node-gyp` must compile Electron-targeted native addon (`better-sqlite3`), otherwise DB binary is missing and save fails.
+
+### Why Visual Studio Installer Was Needed
+- `better-sqlite3` is a native Node module.
+- For Electron, prebuilt binaries are not always usable for your exact Electron/Node ABI combination.
+- Native rebuild uses `node-gyp`, which requires:
+  - Python
+  - MSVC C++ toolchain (from Visual Studio Build Tools)
+  - Windows SDK
+- Without this toolchain, sqlite native binding is not produced, backend DB open fails, and Products save cannot persist.
+
+### How Products Save Now (Working Flow)
+1. UI sends Product create/update request to backend.
+2. Backend `products` route validates/parses data for sqlite-safe values.
+3. Drizzle executes insert/update on local SQLite DB file.
+4. DB file is stored under AppData (persistent across app restarts).
+5. Products list fetch reads the same SQLite records, so saved products remain visible after restart.
+
+### Database Working State (Current)
+- Backend starts successfully with SQLite in desktop packaged mode.
+- Native sqlite binding is present and loadable.
+- Product insert/update operations persist to local DB.
+- Data remains after app restart because storage is file-based SQLite in AppData.
+
+### Verification Checklist Used
+- Added a new product -> appears immediately in list.
+- Restarted app -> product still exists.
+- Edited existing product -> changes persisted after refresh/restart.
+- Confirmed backend process starts without sqlite binding error in logs.
