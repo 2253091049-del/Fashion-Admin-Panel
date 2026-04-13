@@ -108,6 +108,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const restoreInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const apiBase = window.location.protocol === "file:" ? "http://127.0.0.1:3001" : "";
 
   const pageTitle = navItems.find(n => n.path === location)?.label ?? "Dashboard";
 
@@ -121,7 +122,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   async function handleBackupDownload() {
     try {
-      const response = await fetch("/api/backup");
+      const response = await fetch(`${apiBase}/api/backup`);
       if (!response.ok) throw new Error("Failed to load backup");
 
       const payload = await response.json();
@@ -148,7 +149,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       const text = await file.text();
       const payload = JSON.parse(text);
 
-      const response = await fetch("/api/backup/restore", {
+      const response = await fetch(`${apiBase}/api/backup/restore`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),

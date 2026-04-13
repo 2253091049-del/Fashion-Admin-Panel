@@ -204,6 +204,7 @@
 
 
 
+<<<<<<< HEAD
 Full Conversation Log (Build Tools & better-sqlite3 Fix)
 You are right — instead of full Visual Studio, only the C++ Build Tools are needed to compile better-sqlite3. I am installing that properly now so this error does not happen again.
 ```bash
@@ -238,6 +239,9 @@ product save fully working version দিয়ে দেব
 |
 >>>>>
 ### Also add chat for helping build 
+=======
+Prodcuts Update and DB Set Up:
+>>>>>>> f3e0995 (Full workspace update: bugfixes, backup/restore API fix, build artifacts, chat.md summary. See chat.md for details.)
 
 You are right, instead of full Visual Studio, only C++ Build Tools are needed to compile better-sqlite3; I am now installing that properly so this error does not occur again.
 
@@ -271,6 +275,15 @@ I have resumed the installation, but the setup process is still running in the b
 
 Now what you need to do (one time):
 
+<<<<<<< HEAD
+=======
+## Backup Button Fix (file:// runtime)
+- Backup failed because the app is loaded from file:// and the Backup button was calling /api/backup relative to that file URL.
+- Fixed to call the local API (http://127.0.0.1:3001) when running from file mode.
+- Change made in artifacts/sd-fashion/src/components/Layout.tsx (lines ~115-170).
+- New installer built: artifacts/desktop-shell/dist/SD Fashion Admin Setup 0.1.0.exe
+
+>>>>>>> f3e0995 (Full workspace update: bugfixes, backup/restore API fix, build artifacts, chat.md summary. See chat.md for details.)
 Open Visual Studio Installer and go to Build Tools 2022 and click Modify
 Tick Desktop development with C++ workload
 Make sure Windows 10/11 SDK component is selected
@@ -283,3 +296,8 @@ Create new .exe build
 Give you a fully working version where product save works
 
 Now if you say “complete”, I will run the next command immediately.
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> f3e0995 (Full workspace update: bugfixes, backup/restore API fix, build artifacts, chat.md summary. See chat.md for details.)
