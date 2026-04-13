@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useTheme } from "@/components/ThemeProvider";
+import { useToast } from "@/hooks/use-toast";
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -13,6 +14,8 @@ import {
   Menu,
   X,
   Package,
+  Download,
+  Upload,
 } from "lucide-react";
 
 const navItems = [
@@ -103,6 +106,8 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const restoreInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   const pageTitle = navItems.find(n => n.path === location)?.label ?? "Dashboard";
 
@@ -113,6 +118,48 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     month: "long",
     year: "numeric",
   });
+
+  async function handleBackupDownload() {
+    try {
+      const response = await fetch("/api/backup");
+      if (!response.ok) throw new Error("Failed to load backup");
+
+      const payload = await response.json();
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      a.href = url;
+      a.download = `fashion-backup-${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast({ title: "Backup downloaded" });
+    } catch {
+      toast({ title: "Backup failed", description: "Could not export backup." });
+    }
+  }
+
+  async function handleRestoreFile(file: File) {
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text);
+
+      const response = await fetch("/api/backup/restore", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) throw new Error("Restore failed");
+      toast({ title: "Backup restored", description: "Refresh the page to load restored data." });
+    } catch {
+      toast({ title: "Restore failed", description: "Invalid backup file or server error." });
+    }
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -144,9 +191,40 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </button>
             <h1 className="text-xl font-bold text-foreground" data-testid="text-page-title">{pageTitle}</h1>
           </div>
-          <span className="text-sm text-muted-foreground font-medium hidden sm:block" data-testid="text-current-date">
-            {dateStr}
-          </span>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              onClick={handleBackupDownload}
+              data-testid="button-backup-download"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-foreground text-xs sm:text-sm font-medium transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Backup
+            </button>
+            <button
+              onClick={() => restoreInputRef.current?.click()}
+              data-testid="button-backup-restore"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-foreground text-xs sm:text-sm font-medium transition-colors"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              Restore
+            </button>
+            <input
+              ref={restoreInputRef}
+              type="file"
+              accept="application/json"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  void handleRestoreFile(file);
+                }
+                e.currentTarget.value = "";
+              }}
+            />
+            <span className="text-sm text-muted-foreground font-medium hidden sm:block" data-testid="text-current-date">
+              {dateStr}
+            </span>
+          </div>
         </header>
 
         <main className="flex-1 overflow-y-auto p-6">

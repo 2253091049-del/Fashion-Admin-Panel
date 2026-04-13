@@ -8,7 +8,7 @@ function serialize(p: typeof productsTable.$inferSelect) {
   return {
     ...p,
     price: parseFloat(String(p.price)),
-    createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : String(p.createdAt),
+    createdAt: String(p.createdAt),
   };
 }
 
@@ -36,7 +36,7 @@ router.post("/products", async (req, res): Promise<void> => {
 
   const [product] = await db
     .insert(productsTable)
-    .values({ ...data, price: String(data.price) })
+    .values(data)
     .returning();
   res.status(201).json(serialize(product));
 });
@@ -50,7 +50,7 @@ router.put("/products/:id", async (req, res): Promise<void> => {
 
   const [product] = await db
     .update(productsTable)
-    .set({ ...data, price: String(data.price) })
+    .set(data)
     .where(eq(productsTable.id, id))
     .returning();
 

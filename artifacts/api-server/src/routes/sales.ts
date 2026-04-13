@@ -10,6 +10,8 @@ import {
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
+type SaleRow = typeof salesTable.$inferSelect;
+type SaleItemRow = typeof saleItemsTable.$inferSelect;
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -19,7 +21,7 @@ router.get("/sales/summary/today", async (req, res): Promise<void> => {
   const now = new Date();
   const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
   const rows = await db.select().from(salesTable).where(eq(salesTable.date, today));
-  const total = rows.reduce((s, r) => s + parseFloat(String(r.total)), 0);
+  const total = rows.reduce((s: number, r: SaleRow) => s + parseFloat(String(r.total)), 0);
   res.json({ total, count: rows.length });
 });
 
@@ -30,7 +32,7 @@ router.get("/sales/summary/month", async (req, res): Promise<void> => {
     .select()
     .from(salesTable)
     .where(sql`${salesTable.date} LIKE ${prefix + "%"}`);
-  const total = rows.reduce((s, r) => s + parseFloat(String(r.total)), 0);
+  const total = rows.reduce((s: number, r: SaleRow) => s + parseFloat(String(r.total)), 0);
   res.json({ total, count: rows.length });
 });
 
@@ -47,7 +49,7 @@ router.get("/sales/summary/monthly-totals", async (req, res): Promise<void> => {
         .select()
         .from(salesTable)
         .where(sql`${salesTable.date} LIKE ${prefix + "%"}`);
-      const total = rows.reduce((s, r) => s + parseFloat(String(r.total)), 0);
+      const total = rows.reduce((s: number, r: SaleRow) => s + parseFloat(String(r.total)), 0);
       return { month: label, total, count: rows.length };
     })
   );
@@ -75,7 +77,7 @@ router.get("/sales", async (req, res): Promise<void> => {
     .orderBy(sql`${salesTable.createdAt} DESC`);
 
   const withItems = await Promise.all(
-    sales.map(async (sale) => {
+    sales.map(async (sale: SaleRow) => {
       const items = await db
         .select()
         .from(saleItemsTable)
@@ -83,7 +85,7 @@ router.get("/sales", async (req, res): Promise<void> => {
       return {
         ...sale,
         total: parseFloat(String(sale.total)),
-        items: items.map(i => ({
+        items: items.map((i: SaleItemRow) => ({
           ...i,
           rate: parseFloat(String(i.rate)),
           amount: parseFloat(String(i.amount)),
@@ -104,26 +106,26 @@ router.post("/sales", async (req, res): Promise<void> => {
   }
 
   const { items, ...saleData } = parsed.data;
-  const total = items.reduce((s, i) => s + i.qty * i.rate, 0);
+  const total = items.reduce((s: number, i: { qty: number; rate: number }) => s + i.qty * i.rate, 0);
 
   const [sale] = await db
     .insert(salesTable)
     .values({
       ...saleData,
-      total: String(total),
+      total,
     })
     .returning();
 
   const insertedItems = await db
     .insert(saleItemsTable)
     .values(
-      items.map(i => ({
+      items.map((i: { name: string; size: string; qty: number; rate: number }) => ({
         saleId: sale.id,
         name: i.name,
         size: i.size,
         qty: i.qty,
-        rate: String(i.rate),
-        amount: String(i.qty * i.rate),
+        rate: i.rate,
+        amount: i.qty * i.rate,
       }))
     )
     .returning();
@@ -131,7 +133,7 @@ router.post("/sales", async (req, res): Promise<void> => {
   res.status(201).json({
     ...sale,
     total: parseFloat(String(sale.total)),
-    items: insertedItems.map(i => ({
+    items: insertedItems.map((i: SaleItemRow) => ({
       ...i,
       rate: parseFloat(String(i.rate)),
       amount: parseFloat(String(i.amount)),
@@ -164,7 +166,7 @@ router.get("/sales/:id", async (req, res): Promise<void> => {
   res.json({
     ...sale,
     total: parseFloat(String(sale.total)),
-    items: items.map(i => ({
+    items: items.map((i: SaleItemRow) => ({
       ...i,
       rate: parseFloat(String(i.rate)),
       amount: parseFloat(String(i.amount)),

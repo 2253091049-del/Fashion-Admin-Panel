@@ -295,11 +295,15 @@ export default function Dashboard() {
     { query: { queryKey: ["sales-year", selectedYear] } }
   );
 
-  const reportTotal = reportSales.reduce((s, sale) => s + sale.total, 0);
+  const reportSalesList = Array.isArray(reportSales) ? reportSales : [];
+  const allSalesList = Array.isArray(allSales) ? allSales : [];
+  const monthlyTotalsList = Array.isArray(monthlyTotals) ? monthlyTotals : [];
+
+  const reportTotal = reportSalesList.reduce((s, sale) => s + sale.total, 0);
   const reportMonthLabel = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
   const selectedMonthName = MONTHS[selectedMonth - 1];
 
-  const chartData = chartLoading ? [] : (monthlyTotals ?? []).map(m => ({ month: m.month, total: m.total }));
+  const chartData = chartLoading ? [] : monthlyTotalsList.map(m => ({ month: m.month, total: m.total }));
 
   return (
     <div className="space-y-5 max-w-6xl mx-auto">
@@ -325,8 +329,8 @@ export default function Dashboard() {
 
       {/* Today's sales report + Calendar side by side */}
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-5">
-        <DailySalesReport sales={allSales as SaleType[]} />
-        <CalendarSection allSales={allSales as SaleType[]} />
+        <DailySalesReport sales={allSalesList as SaleType[]} />
+        <CalendarSection allSales={allSalesList as SaleType[]} />
       </div>
 
       {/* Monthly report + chart */}

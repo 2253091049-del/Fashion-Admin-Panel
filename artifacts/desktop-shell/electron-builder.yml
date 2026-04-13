@@ -1,0 +1,18 @@
+appId: com.sdfashion.admin
+productName: SD Fashion Admin
+npmRebuild: false
+nodeGypRebuild: false
+files:
+  - build/**
+extraResources:
+  - from: packaged
+    to: packaged
+extraMetadata:
+  main: build/main.js
+win:
+  target:
+    - nsis
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true

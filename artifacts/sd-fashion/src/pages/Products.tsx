@@ -151,6 +151,7 @@ function ProductFormModal({
 export default function Products() {
   const queryClient = useQueryClient();
   const { data: products = [], isLoading } = useListProducts();
+  const productsList = Array.isArray(products) ? products : [];
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
   const deleteProduct = useDeleteProduct();
@@ -205,7 +206,7 @@ export default function Products() {
     });
   }
 
-  const filtered = products.filter(p =>
+  const filtered = productsList.filter(p =>
     !search ||
     p.name.toLowerCase().includes(search.toLowerCase()) ||
     p.category.toLowerCase().includes(search.toLowerCase())

@@ -1,4 +1,5 @@
 import { Switch, Route, Router as WouterRouter } from "wouter";
+import { useHashLocation } from "wouter/use-hash-location";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -27,11 +28,15 @@ function Router() {
 }
 
 function App() {
+  const isFileProtocol = typeof window !== "undefined" && window.location.protocol === "file:";
+  const viteBase = import.meta.env.BASE_URL;
+  const routerBase = viteBase === "./" ? "" : viteBase.replace(/\/$/, "");
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ThemeProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <WouterRouter base={routerBase} hook={isFileProtocol ? useHashLocation : undefined}>
             <Router />
           </WouterRouter>
           <Toaster />

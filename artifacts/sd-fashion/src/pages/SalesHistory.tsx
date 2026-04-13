@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Search, X } from "lucide-react";
+import { CalendarDays, Search, X } from "lucide-react";
 import { useListSales } from "@workspace/api-client-react";
 
 interface SaleItemType {
@@ -87,23 +87,27 @@ function SaleDetailModal({ sale, onClose }: { sale: SaleType; onClose: () => voi
 
 export default function SalesHistory() {
   const [search, setSearch] = useState("");
+  const [selectedDate, setSelectedDate] = useState("");
   const [page, setPage] = useState(1);
   const [viewing, setViewing] = useState<SaleType | null>(null);
   const PER_PAGE = 20;
 
   const { data: allSales = [], isLoading } = useListSales();
+  const allSalesList = Array.isArray(allSales) ? allSales : [];
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    if (!q) return allSales as SaleType[];
-    return (allSales as SaleType[]).filter(
-      s =>
+    return (allSalesList as SaleType[]).filter(s => {
+      const matchesSearch =
+        !q ||
         s.billNo.toLowerCase().includes(q) ||
         s.customer.toLowerCase().includes(q) ||
         s.date.includes(q) ||
-        s.paymentMethod.toLowerCase().includes(q)
-    );
-  }, [search, allSales]);
+        s.paymentMethod.toLowerCase().includes(q);
+      const matchesDate = !selectedDate || s.date === selectedDate;
+      return matchesSearch && matchesDate;
+    });
+  }, [search, selectedDate, allSalesList]);
 
   const totalPages = Math.ceil(filtered.length / PER_PAGE);
   const paginated = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
@@ -116,10 +120,17 @@ export default function SalesHistory() {
         <div className="bg-card border border-card-border rounded-2xl shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
             <h2 className="text-sm font-bold text-foreground">Sales History</h2>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input type="search" placeholder="Search..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} data-testid="input-search"
-                className="pl-9 pr-4 py-1.5 rounded-lg border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] w-52 transition" />
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input type="search" placeholder="Search..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} data-testid="input-search"
+                  className="pl-9 pr-4 py-1.5 rounded-lg border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] w-52 transition" />
+              </div>
+              <div className="relative">
+                <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input type="date" value={selectedDate} onChange={e => { setSelectedDate(e.target.value); setPage(1); }} data-testid="input-date-filter"
+                  className="pl-9 pr-3 py-1.5 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] w-44 transition" />
+              </div>
             </div>
           </div>
 
@@ -160,8 +171,8 @@ export default function SalesHistory() {
                       <td className="px-5 py-3 text-sm font-medium text-muted-foreground">#{num}</td>
                       <td className="px-5 py-3 text-sm text-foreground">{sale.customer}</td>
                       <td className="px-5 py-3 text-sm font-semibold text-foreground">{formatBDT(sale.total)}</td>
-                      <td className="px-5 py-3 text-sm text-foreground">{formatDate(sale.date)}</td>
-                      <td className="px-5 py-3 text-sm text-muted-foreground">—</td>
+                      <td className="px-5 py-3 text-sm text-foreground">{formatBDT(sale.total)}</td>
+                      <td className="px-5 py-3 text-sm text-muted-foreground">{formatBDT(0)}</td>
                       <td className="px-5 py-3 text-sm text-muted-foreground">{formatDate(sale.date)}</td>
                       <td className="px-5 py-3">
                         <button onClick={() => setViewing(sale as SaleType)} data-testid={`button-view-${sale.id}`}

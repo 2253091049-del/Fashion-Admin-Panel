@@ -59,7 +59,6 @@ function ReceiptPreview({ billNo, date, customer, phone, items, note }: {
           <span className="w-8 text-center">Size</span>
           <span className="w-6 text-center">Qty</span>
           <span className="w-20 text-right">Rate</span>
-          <span className="w-20 text-right">Amount</span>
         </div>
         {items.length === 0 ? (
           <p className="text-center text-gray-400 py-1">No items</p>
@@ -70,7 +69,6 @@ function ReceiptPreview({ billNo, date, customer, phone, items, note }: {
               <span className="w-8 text-center">{item.size}</span>
               <span className="w-6 text-center">{item.qty}</span>
               <span className="w-20 text-right">{formatBDT(item.rate)}</span>
-              <span className="w-20 text-right">{formatBDT(item.qty * item.rate)}</span>
             </div>
           ))
         )}
@@ -92,6 +90,7 @@ export default function NewSale() {
   const queryClient = useQueryClient();
   const createSale = useCreateSale();
   const { data: products = [] } = useListProducts();
+  const productsList = Array.isArray(products) ? products : [];
 
   const [billNo] = useState(generateBillNo);
   const [date, setDate] = useState(todayISO);
@@ -119,7 +118,7 @@ export default function NewSale() {
       return;
     }
     const pid = parseInt(productId);
-    const product = products.find(p => p.id === pid);
+    const product = productsList.find(p => p.id === pid);
     if (product) {
       setItems(prev => prev.map(i =>
         i.id === itemId ? { ...i, productId: pid, name: product.name, size: product.size, rate: product.price } : i
@@ -240,15 +239,15 @@ export default function NewSale() {
 
         {/* Items */}
         <div className="mb-4">
-          <div className="hidden md:grid grid-cols-[1fr_90px_80px_110px_120px_36px] gap-2 px-1 mb-1">
-            {["Product", "Size", "Qty", "Rate (BDT)", "Amount", ""].map(h => (
+          <div className="hidden md:grid grid-cols-[1fr_90px_80px_110px_36px] gap-2 px-1 mb-1">
+            {["Product", "Size", "Qty", "Rate (BDT)", ""].map(h => (
               <span key={h} className="text-xs font-semibold text-muted-foreground">{h}</span>
             ))}
           </div>
 
           <div className="space-y-2">
             {items.map((item, idx) => (
-              <div key={item.id} className="grid grid-cols-[1fr_90px_80px_110px_120px_36px] gap-2 items-center" data-testid={`row-item-${idx}`}>
+              <div key={item.id} className="grid grid-cols-[1fr_90px_80px_110px_36px] gap-2 items-center" data-testid={`row-item-${idx}`}>
 
                 {/* Product dropdown */}
                 <select
@@ -258,7 +257,7 @@ export default function NewSale() {
                   className="px-3 py-2 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] transition"
                 >
                   <option value="">— Select product —</option>
-                  {products.map(p => (
+                  {productsList.map(p => (
                     <option key={p.id} value={p.id}>
                       {p.name} {p.size !== "-" ? `(${p.size})` : ""}
                     </option>
@@ -277,10 +276,6 @@ export default function NewSale() {
                 <input type="number" value={item.rate || ""} min={0} placeholder="0" onChange={e => updateItem(item.id, "rate", parseFloat(e.target.value) || 0)} data-testid={`input-rate-${idx}`}
                   className="px-3 py-2 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(174,72%,40%)] transition" />
 
-                <div className="px-3 py-2 rounded-lg border border-border bg-muted/40 text-sm font-semibold text-foreground" data-testid={`text-amount-${idx}`}>
-                  {formatBDT(item.qty * item.rate)}
-                </div>
-
                 <button onClick={() => removeItem(item.id)} disabled={items.length === 1} data-testid={`button-remove-item-${idx}`}
                   className="w-9 h-9 flex items-center justify-center rounded-lg bg-[hsl(0,84%,60%)] hover:bg-[hsl(0,84%,50%)] disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors">
                   <X className="w-4 h-4" />
@@ -289,7 +284,7 @@ export default function NewSale() {
             ))}
           </div>
 
-          {products.length === 0 && (
+          {productsList.length === 0 && (
             <p className="mt-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
               No products in inventory. Add products in the Products section first.
             </p>
