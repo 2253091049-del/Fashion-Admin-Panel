@@ -237,7 +237,7 @@ product save fully working version দিয়ে দেব
 |
 |
 >>>>>
-Also add chat for helping build 
+### Also add chat for helping build 
 
 You are right, instead of full Visual Studio, only C++ Build Tools are needed to compile better-sqlite3; I am now installing that properly so this error does not occur again.
 
